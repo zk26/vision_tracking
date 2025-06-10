@@ -2,7 +2,6 @@
 #include <sensor_msgs/msg/image.hpp>
 #include <sensor_msgs/msg/camera_info.hpp>
 #include <geometry_msgs/msg/point_stamped.hpp>
-#include <geometry_msgs/msg/point.hpp>
 #include <cv_bridge/cv_bridge.h>
 #include <image_geometry/pinhole_camera_model.h>
 #include <tf2_ros/transform_listener.h>
@@ -35,7 +34,7 @@ public:
         
         // TF2初始化
         tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-        tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+        tf_listener_ = std::make_shared<tf极2_ros::TransformListener>(*tf_buffer_);
         
         RCLCPP_INFO(this->get_logger(), "Depth Processor node started");
     }
@@ -49,7 +48,7 @@ private:
         }
     }
     
-    void position_callback(const geometry_msgs::msg::PointStamped::ConstSharedPtr &msg) {
+    void position_callback(const geometry_msgs::msg::极ointStamped::ConstSharedPtr &msg) {
         current_position_ = *msg;
         position_received_ = true;
     }
@@ -96,7 +95,7 @@ private:
                 auto transform = tf_buffer_->lookupTransform(
                     "base_footprint", 
                     target_3d.header.frame_id,
-                    target_3d.header.stamp,
+                    tf2::TimePointZero,
                     rclcpp::Duration::from_seconds(0.1));
                     
                 tf2::doTransform(target_3d, transformed_point, transform);
