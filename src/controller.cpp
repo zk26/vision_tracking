@@ -22,7 +22,7 @@ public:
         this->declare_parameter("kp_linear", 0.2);
         this->declare_parameter("kp_angular", 0.8);
         this->declare_parameter("safe_distance", 0.5);
-        this->declare极arameter("target_lost_timeout", 2.0);
+        this->declare_parameter("target_lost_timeout", 2.0);
         this->declare_parameter("max_linear_vel", 0.5);
         this->declare_parameter("max_angular_vel", 1.0);
         
@@ -136,7 +136,7 @@ private:
     
     // TF2
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
-    std::shared_ptr<极f2_ros::TransformListener> tf_listener_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 };
 
 int main(int argc, char **argv) {
