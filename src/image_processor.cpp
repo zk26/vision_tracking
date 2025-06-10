@@ -1,112 +1,122 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
-#include <sensor_msgs/msg/camera_info.hpp>
 #include <geometry_msgs/msg/point_stamped.hpp>
-#include <geometry_msgs/msg/point.hpp>
 #include <cv_bridge/cv_bridge.h>
-#include <image_geometry/pinhole_camera_model.h>
-#include <tf2_ros/transform_listener.h>
-#include <tf2_ros/buffer.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <opencv2/opencv.hpp>
-#include <memory>
+#include <image_transport/image_transport.hpp>
 
 using namespace std::chrono_literals;
 
-class DepthProcessor : public rclcpp::Node {
+class ImageProcessor : public rclcpp::Node {
 public:
-    DepthProcessor() : Node("depth_processor"), camera_model_initialized_(false) {
-        // 订阅深度图像和相机信息
-        depth_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
-            "/camera/depth/image_raw", 10,
-            std::bind(&DepthProcessor::depth_callback, this, std::placeholders::_1));
+    ImageProcessor() : Node("image_processor"), frame_width_(640), frame_height_(480) {
+        // 参数声明
+        this->declare_parameter("h_min", 0);
+        this->declare_parameter("s_min", 120);
+        this->declare_parameter("v_min", 70);
+        this->declare_parameter("h_max", 10);
+        this->declare_parameter("s_max", 255);
+        this->declare_parameter("v_max", 255);
+        this->declare_parameter("min_radius", 20);
         
-        camera_info_sub_ = this->create_subscription<sensor_msgs::msg::CameraInfo>(
-            "/camera/depth/camera_info", 10,
-            std::bind(&DepthProcessor::camera_info_callback, this, std::placeholders::_1));
+        // 获取参数
+        this->get_parameter("h_min", h_min_);
+        this->get_parameter("s_min", s_min_);
+        this->get_parameter("v_min", v_min_);
+        this->get_parameter("h_max", h_max_);
+        this->get_parameter("s_max", s_max_);
+        this->get_parameter("v_max", v_max_);
+        this->get_parameter("min_radius", min_radius_);
         
-        // 订阅目标在图像中的位置
-        position_sub_ = this->create_subscription<geometry_msgs::msg::PointStamped>(
-            "target_position", 10,
-            std::bind(&DepthProcessor::position_callback, this, std::placeholders::_1));
-            
-        // 发布目标在3D空间中的位置
-        target_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("target_3d", 10);
+        // 订阅RGB图像话题
+        image_sub_ = image_transport::create_subscription(
+            this, "/camera/image_raw",
+            std::bind(&ImageProcessor::image_callback, this, std::placeholders::_1),
+            "raw", rmw_qos_profile_sensor_data);
         
-        // TF2初始化
-        tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-        tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+        // 创建发布目标位置的发布者
+        position_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("target_position", 10);
         
-        RCLCPP_INFO(this->get_logger(), "Depth Processor node started");
+        // 可视化话题
+        debug_pub_ = image_transport::create_publisher(this, "debug_image");
+        
+        RCLCPP_INFO(this->get_logger(), "Image Processor node started");
+        RCLCPP_INFO(this->get_logger(), "Color parameters: H[%d-%d], S[%d-%d], V[%d-%d], Min radius: %d", 
+                   h_min_, h_max_, s_min_, s_max_, v_min_, v_max_, min_radius_);
     }
 
 private:
-    void camera_info_callback(const sensor_msgs::msg::CameraInfo::ConstSharedPtr &msg) {
-        if (!camera_model_initialized_) {
-            camera_model_.fromCameraInfo(msg);
-            camera_model_initialized_ = true;
-            RCLCPP_INFO(this->get_logger(), "Camera model initialized");
-        }
-    }
-    
-    void position_callback(const geometry_msgs::msg::PointStamped::ConstSharedPtr &msg) {
-        current_position_ = *msg;
-        position_received_ = true;
-    }
-    
-    void depth_callback(const sensor_msgs::msg::Image::ConstSharedPtr &msg) {
-        if (!camera_model_initialized_ || !position_received_) return;
-        
+    void image_callback(const sensor_msgs::msg::Image::ConstSharedPtr &msg) {
         try {
-            cv::Mat depth_image = cv_bridge::toCvCopy(msg)->image;
+            // 转换为OpenCV格式
+            cv::Mat frame = cv_bridge::toCvCopy(msg, "bgr8")->image;
+            frame_width_ = frame.cols;
+            frame_height_ = frame.rows;
             
-            // 获取目标位置
-            cv::Point2d uv(current_position_.point.x, current_position_.point.y);
+            cv::Mat hsv, mask;
             
-            // 检查位置是否在图像范围内
-            if (uv.x < 0 || uv.x >= depth_image.cols || 
-                uv.y < 0 || uv.y >= depth_image.rows) {
-                return;
-            }
+            // 转换为HSV空间并应用模糊
+            cv::cvtColor(frame, hsv, cv::COLOR_BGR2HSV);
+            cv::GaussianBlur(hsv, hsv, cv::Size(9, 9), 2);
             
-            // 获取深度值（单位：米）
-            float depth = depth_image.at<float>(static_cast<int>(uv.y), static_cast<int>(uv.x));
+            // 颜色阈值
+            cv::inRange(hsv, 
+                        cv::Scalar(h_min_, s_min_, v_min_), 
+                        cv::Scalar(h_max_, s_max_, v_max_), 
+                        mask);
             
-            if (std::isnan(depth) || depth <= 0) {
-                RCLCPP_WARN(this->get_logger(), "Invalid depth value: %f", depth);
-                return;
-            }
+            // 形态学操作
+            cv::Mat kernel = cv::getStructuringElement(cv::MORPH_RECT, cv::Size(5, 5));
+            cv::morphologyEx(mask, mask, cv::MORPH_OPEN, kernel);
+            cv::morphologyEx(mask, mask, cv::MORPH_CLOSE, kernel);
             
-            // 将2D点转换为3D点
-            cv::Point3d ray = camera_model_.projectPixelTo3dRay(uv);
-            ray.x *= depth;
-            ray.y *= depth;
-            ray.z = depth;
+            // 查找轮廓
+            std::vector<std::vector<cv::Point>> contours;
+            std::vector<cv::Vec4i> hierarchy;
+            cv::findContours(mask, contours, hierarchy, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
             
-            // 创建3D点消息
-            geometry_msgs::msg::PointStamped target_3d;
-            target_3d.header = msg->header;
-            target_3d.point.x = ray.x;
-            target_3d.point.y = ray.y;
-            target_3d.point.z = ray.z;
+            auto position_msg = geometry_msgs::msg::PointStamped();
+            position_msg.header = msg->header;
+            position_msg.header.frame_id = "camera_link";
             
-            // 转换到机器人坐标系
-            geometry_msgs::msg::PointStamped transformed_point;
-            try {
-                auto transform = tf_buffer_->lookupTransform(
-                    "base_footprint", 
-                    target_3d.header.frame_id,
-                    target_3d.header.stamp,
-                    rclcpp::Duration::from_seconds(0.1));
+            // 处理轮廓
+            if (!contours.empty()) {
+                // 寻找最大轮廓
+                auto max_contour = *std::max_element(contours.begin(), contours.end(),
+                    [](const std::vector<cv::Point>& a, const std::vector<cv::Point>& b) {
+                        return cv::contourArea(a) < cv::contourArea(b);
+                    });
+                
+                // 最小外接圆
+                cv::Point2f center;
+                float radius;
+                cv::minEnclosingCircle(max_contour, center, radius);
+                
+                if (radius > min_radius_) {
+                    // 发布目标中心位置
+                    position_msg.point.x = center.x;
+                    position_msg.point.y = center.y;
+                    position_msg.point.z = radius; // 存储半径表示目标大小
+                    position_pub_->publish(position_msg);
                     
-                tf2::doTransform(target_3d, transformed_point, transform);
-                transformed_point.header.stamp = this->now();
-                transformed_point.header.frame_id = "base_footprint";
-                target_pub_->publish(transformed_point);
-            } catch (const tf2::TransformException &ex) {
-                RCLCPP_WARN(this->get_logger(), "TF error: %s", ex.what());
+                    // 可视化
+                    cv::circle(frame, center, static_cast<int>(radius), cv::Scalar(0, 255, 0), 2);
+                    cv::circle(frame, center, 3, cv::Scalar(0, 0, 255), -1);
+                    cv::putText(frame, "Target", 
+                                cv::Point(static_cast<int>(center.x - radius), static_cast<int>(center.y - radius - 5)),
+                                cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 255, 0), 1);
+                }
             }
             
+            // 发布调试图像
+            if (debug_pub_.getNumSubscribers() > 0) {
+                cv::Mat color_mask;
+                cv::cvtColor(mask, color_mask, cv::COLOR_GRAY2BGR);
+                cv::Mat debug_frame;
+                cv::vconcat(frame, color_mask, debug_frame);
+                auto debug_msg = cv_bridge::CvImage(msg->header, "bgr8", debug_frame).toImageMsg();
+                debug_pub_.publish(debug_msg);
+            }
         } catch (const cv_bridge::Exception& e) {
             RCLCPP_ERROR(this->get_logger(), "cv_bridge exception: %s", e.what());
         } catch (const std::exception& e) {
@@ -115,25 +125,20 @@ private:
     }
     
     // 成员变量
-    bool camera_model_initialized_ = false;
-    bool position_received_ = false;
-    image_geometry::PinholeCameraModel camera_model_;
-    geometry_msgs::msg::PointStamped current_position_;
+    int h_min_ = 0, s_min_ = 0, v_min_ = 0;
+    int h_max_ = 0, s_max_ = 0, v_max_ = 0;
+    int min_radius_ = 0;
+    int frame_width_ = 0, frame_height_ = 0;
     
     // ROS2接口
-    rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_sub_;
-    rclcpp::Subscription<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info_sub_;
-    rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr position_sub_;
-    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr target_pub_;
-    
-    // TF2
-    std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+    image_transport::Subscriber image_sub_;
+    image_transport::Publisher debug_pub_;
+    rclcpp::Publisher<geometry_msgs::msg::PointStamped>::SharedPtr position_pub_;
 };
 
 int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<DepthProcessor>();
+    auto node = std::make_shared<ImageProcessor>();
     rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
