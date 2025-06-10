@@ -22,7 +22,7 @@ public:
         this->declare_parameter("kp_linear", 0.2);
         this->declare_parameter("kp_angular", 0.8);
         this->declare_parameter("safe_distance", 0.5);
-        this->declare_parameter("target_lost_timeout", 2.0);
+        this->declare极arameter("target_lost_timeout", 2.0);
         this->declare_parameter("max_linear_vel", 0.5);
         this->declare_parameter("max_angular_vel", 1.0);
         
@@ -30,7 +30,7 @@ public:
         this->get_parameter("kp_linear", kp_linear_);
         this->get_parameter("kp_angular", kp_angular_);
         this->get_parameter("safe_distance", safe_distance_);
-        this->get_parameter("target_lost_time极", target_lost_timeout_);
+        this->get_parameter("target_lost_timeout", target_lost_timeout_);
         this->get_parameter("max_linear_vel", max_linear_vel_);
         this->get_parameter("max_angular_vel", max_angular_vel_);
         
@@ -77,11 +77,11 @@ private:
         }
         
         try {
-            // 获取最新变换
+            // 获取最新变换 (修正API调用)
             auto transform = tf_buffer_->lookupTransform(
                 "base_footprint", 
                 current_target_.header.frame_id,
-                tf2::TimePointZero,
+                rclcpp::Time(0), // 使用rclcpp::Time而不是tf2::TimePointZero
                 rclcpp::Duration::from_seconds(0.1));
             
             // 转换目标点到base_footprint
@@ -104,7 +104,7 @@ private:
             cmd.linear.x = std::clamp(kp_linear_ * distance, 0.0, max_linear_vel_);
             cmd.angular.z = std::clamp(kp_angular_ * angle, -max_angular_vel_, max_angular_vel_);
             
-            RCLCPP_INFO(this->get_logger(), "Control cmd: lin=%.2f, ang=%.2f, dist=%.2f, ang=%.2f",
+            RCLCPP_DEBUG(this->get_logger(), "Control cmd: lin=%.2f, ang=%.2f, dist=%.2f, ang=%.2f",
                          cmd.linear.x, cmd.angular.z, distance, angle);
             
             // 发布控制指令
@@ -136,7 +136,7 @@ private:
     
     // TF2
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+    std::shared_ptr<极f2_ros::TransformListener> tf_listener_;
 };
 
 int main(int argc, char **argv) {

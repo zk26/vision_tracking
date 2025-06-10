@@ -34,7 +34,7 @@ public:
         
         // TF2初始化
         tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-        tf_listener_ = std::make_shared<tf极2_ros::TransformListener>(*tf_buffer_);
+        tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_); // 修正中文字符
         
         RCLCPP_INFO(this->get_logger(), "Depth Processor node started");
     }
@@ -48,7 +48,7 @@ private:
         }
     }
     
-    void position_callback(const geometry_msgs::msg::极ointStamped::ConstSharedPtr &msg) {
+    void position_callback(const geometry_msgs::msg::PointStamped::ConstSharedPtr &msg) { // 修正中文字符
         current_position_ = *msg;
         position_received_ = true;
     }
@@ -89,13 +89,13 @@ private:
             target_3d.point.y = ray.y;
             target_3d.point.z = ray.z;
             
-            // 转换到机器人坐标系
+            // 转换到机器人坐标系 (修正API调用)
             geometry_msgs::msg::PointStamped transformed_point;
             try {
                 auto transform = tf_buffer_->lookupTransform(
                     "base_footprint", 
                     target_3d.header.frame_id,
-                    tf2::TimePointZero,
+                    rclcpp::Time(0), // 使用rclcpp::Time而不是tf2::TimePointZero
                     rclcpp::Duration::from_seconds(0.1));
                     
                 tf2::doTransform(target_3d, transformed_point, transform);
@@ -127,7 +127,7 @@ private:
     
     // TF2
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_; // 修正中文字符
 };
 
 int main(int argc, char **argv) {
