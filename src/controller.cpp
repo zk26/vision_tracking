@@ -7,106 +7,127 @@
 #include <cmath>
 #include <algorithm>
 #include <memory>
-#include <thread> // 用于安全检查线程
+#include <thread>
+#include <atomic>
+#include <mutex>
 
 using namespace std::chrono_literals;
 
 class Controller : public rclcpp::Node {
 public:
-    Controller() : Node("controller"), 
-                   kp_linear_(0.2), 
-                   kp_angular_(0.8),
-                   safe_distance_(0.5),
-                   target_lost_timeout_(2.0) {
-        
-        // 参数声明
-        this->declare_parameter("kp_linear", 0.2);
-        this->declare_parameter("kp_angular", 0.8);
-        this->declare_parameter("safe_distance", 0.5);
-        this->declare_parameter("target_lost_timeout", 2.0);
-        this->declare_parameter("max_linear_vel", 0.5);
-        this->declare_parameter("max_angular_vel", 1.0);
+    Controller() : Node("controller") {
+        // 声明参数
+        declare_parameter("kp_linear", 0.3);
+        declare_parameter("kp_angular", 0.8);
+        declare_parameter("safe_distance", 0.5);
+        declare_parameter("target_lost_timeout", 2.0);
+        declare_parameter("max_linear_vel", 0.5);
+        declare_parameter("max_angular_vel", 1.0);
         
         // 获取参数
-        this->get_parameter("kp_linear", kp_linear_);
-        this->get_parameter("kp_angular", kp_angular_);
-        this->get_parameter("safe_distance", safe_distance_);
-        this->get_parameter("target_lost_timeout", target_lost_timeout_);
-        this->get_parameter("max_linear_vel", max_linear_vel_);
-        this->get_parameter("max_angular_vel", max_angular_vel_);
+        kp_linear_ = get_parameter("kp_linear").as_double();
+        kp_angular_ = get_parameter("kp_angular").as_double();
+        safe_distance_ = get_parameter("safe_distance").as_double();
+        target_lost_timeout_ = get_parameter("target_lost_timeout").as_double();
+        max_linear_vel_ = get_parameter("max_linear_vel").as_double();
+        max_angular_vel_ = get_parameter("max_angular_vel").as_double();
+        bool use_sim_time = get_parameter("use_sim_time").as_bool();
+        
+        // 设置使用仿真时间
+        auto parameters_client = std::make_shared<rclcpp::SyncParametersClient>(this);
+        parameters_client->set_parameters({
+            rclcpp::Parameter("use_sim_time", use_sim_time)
+        });
+        
+        // 打印参数
+        RCLCPP_INFO(get_logger(), "Controller parameters:");
+        RCLCPP_INFO(get_logger(), "  kp_linear: %.2f", kp_linear_);
+        RCLCPP_INFO(get_logger(), "  kp_angular: %.2f", kp_angular_);
+        RCLCPP_INFO(get_logger(), "  safe_distance: %.2f", safe_distance_);
+        RCLCPP_INFO(get_logger(), "  target_lost_timeout: %.2f", target_lost_timeout_);
+        RCLCPP_INFO(get_logger(), "  max_linear_vel: %.2f", max_linear_vel_);
+        RCLCPP_INFO(get_logger(), "  max_angular_vel: %.2f", max_angular_vel_);
+        RCLCPP_INFO(get_logger(), "  use_sim_time: %s", use_sim_time ? "true" : "false");
         
         // 订阅目标位置
-        target_sub_ = this->create_subscription<geometry_msgs::msg::PointStamped>(
-            "target_3d", 10,
-            std::bind(&Controller::target_callback, this, std::placeholders::_1));
-            
+        target_sub_ = create_subscription<geometry_msgs::msg::PointStamped>(
+            "target_3d", 10, std::bind(&Controller::target_callback, this, std::placeholders::_1));
+        
         // 创建控制指令发布者
-        cmd_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
+        cmd_pub_ = create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
         
         // TF2初始化
-        tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
+        tf_buffer_ = std::make_unique<tf2_ros::Buffer>(get_clock());
         tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
         
         // 定时器用于处理目标丢失
-        timer_ = this->create_wall_timer(
-            100ms,
-            std::bind(&Controller::timer_callback, this));
-            
-        // 启动安全检查线程
-        safety_thread_ = std::thread(&Controller::safety_monitor, this);
-            
-        RCLCPP_INFO(this->get_logger(), "Controller node started with safety checks");
-    }
-    
-    ~Controller() {
-        if (safety_thread_.joinable()) {
-            terminate_safety_thread_ = true;
-            safety_thread_.join();
-        }
+        timer_ = create_wall_timer(100ms, std::bind(&Controller::timer_callback, this));
+        
+        RCLCPP_INFO(get_logger(), "Controller node successfully initialized");
     }
 
 private:
     void target_callback(const geometry_msgs::msg::PointStamped::SharedPtr msg) {
-        last_target_time_ = this->now();
+        last_target_time_ = get_clock()->now();
         current_target_ = *msg;
         target_available_ = true;
+        
+        RCLCPP_DEBUG(get_logger(), "Target received: (%.2f, %.2f, %.2f)",
+                    msg->point.x, msg->point.y, msg->point.z);
     }
     
     void timer_callback() {
-        auto cmd = geometry_msgs::msg::Twist();
+        geometry_msgs::msg::Twist cmd;
+        auto current_time = get_clock()->now();
         
-        // 检查目标是否超时
-        if ((this->now() - last_target_time_).seconds() > target_lost_timeout_) {
-            target_available_ = false;
-            RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, "Target lost!");
+        // 处理时间源一致性
+        if (current_time.get_clock_type() == last_target_time_.get_clock_type()) {
+            auto duration = current_time - last_target_time_;
+            
+            // 目标丢失处理
+            if (duration.seconds() > target_lost_timeout_) {
+                if (target_available_) {
+                    RCLCPP_WARN(get_logger(), "Target lost! Stopping robot.");
+                    target_available_ = false;
+                }
+                cmd_pub_->publish(cmd);
+                return;
+            }
+        } else {
+            RCLCPP_WARN(get_logger(), "Time source mismatch! Resetting.");
+            last_target_time_ = current_time;
+            cmd_pub_->publish(cmd);
+            return;
         }
         
         if (!target_available_) {
-            // 停止移动
             cmd_pub_->publish(cmd);
             return;
         }
         
         try {
-            // 获取最新变换
+            // 获取变换
             auto transform = tf_buffer_->lookupTransform(
                 "base_footprint", 
                 current_target_.header.frame_id,
-                rclcpp::Time(0),
-                rclcpp::Duration::from_seconds(0.1));
+                tf2::TimePointZero,
+                100ms);
             
-            // 转换目标点到base_footprint
+            // 转换目标点
             geometry_msgs::msg::PointStamped transformed_point;
             tf2::doTransform(current_target_, transformed_point, transform);
             
             // 计算到目标的距离和角度
-            double distance = std::hypot(transformed_point.point.x, transformed_point.point.y);
-            double angle = std::atan2(transformed_point.point.y, transformed_point.point.x);
+            double dx = transformed_point.point.x;
+            double dy = transformed_point.point.y;
+            double distance = std::hypot(dx, dy);
+            double angle = std::atan2(dy, dx);
             
             // 安全距离检查
             if (distance < safe_distance_) {
-                RCLCPP_WARN_THROTTLE(this->get_logger(), *this->get_clock(), 1000, 
-                                    "Too close to target! Distance: %.2fm", distance);
+                RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1000, 
+                                    "Too close to target (%.2fm < %.2fm)! Stopping.",
+                                    distance, safe_distance_);
                 cmd_pub_->publish(cmd);
                 return;
             }
@@ -115,73 +136,34 @@ private:
             cmd.linear.x = std::clamp(kp_linear_ * distance, 0.0, max_linear_vel_);
             cmd.angular.z = std::clamp(kp_angular_ * angle, -max_angular_vel_, max_angular_vel_);
             
-            // 将当前命令存入安全锁
-            {
-                std::lock_guard<std::mutex> lock(cmd_mutex_);
-                last_cmd_ = cmd;
-            }
-            
-            RCLCPP_DEBUG(this->get_logger(), "Control cmd: lin=%.2f, ang=%.2f, dist=%.2f, ang=%.2f",
-                         cmd.linear.x, cmd.angular.z, distance, angle);
+            RCLCPP_DEBUG(get_logger(), "Control command: linear=%.2f, angular=%.2f",
+                         cmd.linear.x, cmd.angular.z);
             
             // 发布控制指令
             cmd_pub_->publish(cmd);
-        } catch (const tf2::TransformException &ex) {
-            RCLCPP_WARN(this->get_logger(), "TF error in controller: %s", ex.what());
-            cmd_pub_->publish(cmd);
-        } catch (const std::exception &e) {
-            RCLCPP_ERROR(this->get_logger(), "Controller error: %s", e.what());
-            cmd_pub_->publish(cmd);
         }
-    }
-    
-    // 安全检查线程（独立于ROS定时器）
-    void safety_monitor() {
-        rclcpp::Rate rate(20); // 20Hz检查频率
-        while (rclcpp::ok() && !terminate_safety_thread_) {
-            geometry_msgs::msg::Twist current_cmd;
-            {
-                std::lock_guard<std::mutex> lock(cmd_mutex_);
-                current_cmd = last_cmd_;
-            }
-            
-            // 安全性检查1：速度指令是否超限
-            if (std::abs(current_cmd.linear.x) > max_linear_vel_ * 1.15 || 
-                std::abs(current_cmd.angular.z) > max_angular_vel_ * 1.15) {
-                RCLCPP_ERROR(this->get_logger(), 
-                            "Velocity command overflow! Lin: %.2f (max %.2f), Ang: %.2f (max %.2f)",
-                            current_cmd.linear.x, max_linear_vel_,
-                            current_cmd.angular.z, max_angular_vel_);
-                
-                // 发布停止指令
-                auto emergency_cmd = geometry_msgs::msg::Twist();
-                cmd_pub_->publish(emergency_cmd);
-                
-                // 重置指令
-                {
-                    std::lock_guard<std::mutex> lock(cmd_mutex_);
-                    last_cmd_ = emergency_cmd;
-                }
-            }
-            
-            // 可以添加更多安全检查...
-            
-            rate.sleep();
+        catch (const tf2::TransformException &ex) {
+            RCLCPP_WARN(get_logger(), "Transform error: %s", ex.what());
+        }
+        catch (const std::exception &e) {
+            RCLCPP_ERROR(get_logger(), "Error in controller: %s", e.what());
         }
     }
     
     // 控制参数
-    double kp_linear_ = 0.0, kp_angular_ = 0.0;
-    double safe_distance_ = 0.0;
-    double target_lost_timeout_ = 0.0;
-    double max_linear_vel_ = 0.0, max_angular_vel_ = 0.0;
+    double kp_linear_;
+    double kp_angular_;
+    double safe_distance_;
+    double target_lost_timeout_;
+    double max_linear_vel_;
+    double max_angular_vel_;
     
-    // 状态变量
+    // 状态
     bool target_available_ = false;
     rclcpp::Time last_target_time_;
     geometry_msgs::msg::PointStamped current_target_;
     
-    // ROS2接口
+    // ROS接口
     rclcpp::Subscription<geometry_msgs::msg::PointStamped>::SharedPtr target_sub_;
     rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
     rclcpp::TimerBase::SharedPtr timer_;
@@ -189,18 +171,11 @@ private:
     // TF2
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
-    
-    // 安全监测
-    geometry_msgs::msg::Twist last_cmd_;  // 最后发送的指令
-    std::mutex cmd_mutex_;               // 指令互斥锁
-    std::thread safety_thread_;          // 安全监测线程
-    std::atomic<bool> terminate_safety_thread_{false};
 };
 
-int main(int argc, char **argv) {
+int main(int argc, char * argv[]) {
     rclcpp::init(argc, argv);
-    auto node = std::make_shared<Controller>();
-    rclcpp::spin(node);
+    rclcpp::spin(std::make_shared<Controller>());
     rclcpp::shutdown();
     return 0;
 }

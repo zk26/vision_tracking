@@ -1,0 +1,10 @@
+/**:
+  ros__parameters:
+    use_sim_time: true 
+    kp_linear: 0.3
+    kp_angular: 0.8
+    safe_distance: 0.5
+    target_lost_timeout: 2.0
+    max_linear_vel: 0.5
+    max_angular_vel: 1.0
+     
