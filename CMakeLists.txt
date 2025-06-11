@@ -16,23 +16,43 @@ find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 
+# ==== 头文件包含设置 ==== #
+include_directories(include)  # 添加全局包含路径
+
 # Create executables
 add_executable(image_processor src/image_processor.cpp)
 ament_target_dependencies(image_processor
   rclcpp cv_bridge image_transport sensor_msgs geometry_msgs)
 target_link_libraries(image_processor ${OpenCV_LIBS})
 
+# 为image_processor指定包含路径
+target_include_directories(image_processor PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
 add_executable(depth_processor src/depth_processor.cpp)
 ament_target_dependencies(depth_processor
   rclcpp cv_bridge sensor_msgs geometry_msgs image_geometry tf2_ros tf2_geometry_msgs)
 target_link_libraries(depth_processor ${OpenCV_LIBS})
 
+# 为depth_processor指定包含路径
+target_include_directories(depth_processor PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
 add_executable(controller src/controller.cpp)
 ament_target_dependencies(controller
   rclcpp geometry_msgs tf2_ros tf2_geometry_msgs)
 
-# ==== 关键修复部分 ==== #
+# 为controller指定包含路径
+target_include_directories(controller PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
 
+# ==== 安装设置 ==== #
 # 安装可执行文件
 install(TARGETS 
   image_processor depth_processor controller
@@ -61,6 +81,12 @@ install(
   DESTINATION share/${PROJECT_NAME}/urdf
 )
 
+install(
+  DIRECTORY include/
+  DESTINATION include/
+)
+
+# 安装头文件
 install(
   DIRECTORY include/
   DESTINATION include/

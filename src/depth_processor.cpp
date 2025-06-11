@@ -9,12 +9,16 @@
 #include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
 #include <opencv2/opencv.hpp>
 #include <memory>
+#include "vision_tracking/kalman_filter.hpp"  // 包含卡尔曼滤波器头文件
 
 using namespace std::chrono_literals;
 
 class DepthProcessor : public rclcpp::Node {
 public:
-    DepthProcessor() : Node("depth_processor"), camera_model_initialized_(false) {
+    DepthProcessor() : Node("depth_processor"), 
+                       camera_model_initialized_(false),
+                       kalman_initialized_(false) {  // 添加卡尔曼初始化标志
+        
         // 订阅深度图像和相机信息
         depth_sub_ = this->create_subscription<sensor_msgs::msg::Image>(
             "/camera/depth/image_raw", 10,
@@ -34,9 +38,12 @@ public:
         
         // TF2初始化
         tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
-        tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_); // 修正中文字符
+        tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
         
-        RCLCPP_INFO(this->get_logger(), "Depth Processor node started");
+        // 初始化卡尔曼滤波器 (采样时间0.1s，过程噪声0.01，测量噪声0.1)
+        kf_ = std::make_unique<KalmanFilter>(0.1, 0.01, 0.1);
+        
+        RCLCPP_INFO(this->get_logger(), "Depth Processor node started with Kalman filtering");
     }
 
 private:
@@ -48,8 +55,17 @@ private:
         }
     }
     
-    void position_callback(const geometry_msgs::msg::PointStamped::ConstSharedPtr &msg) { // 修正中文字符
+    void position_callback(const geometry_msgs::msg::PointStamped::ConstSharedPtr &msg) {
         current_position_ = *msg;
+        
+        // 初始化卡尔曼滤波器（第一次收到位置时）
+        if (!kalman_initialized_) {
+            Eigen::Vector2d z0(current_position_.point.x, current_position_.point.y);
+            kf_->initialize(z0);
+            kalman_initialized_ = true;
+            RCLCPP_INFO(this->get_logger(), "Kalman filter initialized");
+        }
+        
         position_received_ = true;
     }
     
@@ -59,12 +75,18 @@ private:
         try {
             cv::Mat depth_image = cv_bridge::toCvCopy(msg)->image;
             
-            // 获取目标位置
-            cv::Point2d uv(current_position_.point.x, current_position_.point.y);
+            // 使用卡尔曼滤波更新位置
+            Eigen::Vector2d measurement(current_position_.point.x, current_position_.point.y);
+            kf_->update(measurement);
+            Eigen::Vector2d filtered = kf_->getState();
+            
+            // 获取目标位置（使用滤波后的值）
+            cv::Point2d uv(filtered[0], filtered[1]);
             
             // 检查位置是否在图像范围内
             if (uv.x < 0 || uv.x >= depth_image.cols || 
                 uv.y < 0 || uv.y >= depth_image.rows) {
+                RCLCPP_DEBUG(this->get_logger(), "Target out of image bounds");
                 return;
             }
             
@@ -89,13 +111,13 @@ private:
             target_3d.point.y = ray.y;
             target_3d.point.z = ray.z;
             
-            // 转换到机器人坐标系 (修正API调用)
+            // 转换到机器人坐标系
             geometry_msgs::msg::PointStamped transformed_point;
             try {
                 auto transform = tf_buffer_->lookupTransform(
                     "base_footprint", 
                     target_3d.header.frame_id,
-                    rclcpp::Time(0), // 使用rclcpp::Time而不是tf2::TimePointZero
+                    rclcpp::Time(0),
                     rclcpp::Duration::from_seconds(0.1));
                     
                 tf2::doTransform(target_3d, transformed_point, transform);
@@ -116,8 +138,10 @@ private:
     // 成员变量
     bool camera_model_initialized_ = false;
     bool position_received_ = false;
+    bool kalman_initialized_ = false;  // 卡尔曼滤波器初始化标志
     image_geometry::PinholeCameraModel camera_model_;
     geometry_msgs::msg::PointStamped current_position_;
+    std::unique_ptr<KalmanFilter> kf_;  // 卡尔曼滤波器实例
     
     // ROS2接口
     rclcpp::Subscription<sensor_msgs::msg::Image>::SharedPtr depth_sub_;
@@ -127,7 +151,7 @@ private:
     
     // TF2
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
-    std::shared_ptr<tf2_ros::TransformListener> tf_listener_; // 修正中文字符
+    std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
 };
 
 int main(int argc, char **argv) {

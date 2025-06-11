@@ -7,6 +7,7 @@
 #include <cmath>
 #include <algorithm>
 #include <memory>
+#include <thread> // 用于安全检查线程
 
 using namespace std::chrono_literals;
 
@@ -51,7 +52,17 @@ public:
             100ms,
             std::bind(&Controller::timer_callback, this));
             
-        RCLCPP_INFO(this->get_logger(), "Controller node started");
+        // 启动安全检查线程
+        safety_thread_ = std::thread(&Controller::safety_monitor, this);
+            
+        RCLCPP_INFO(this->get_logger(), "Controller node started with safety checks");
+    }
+    
+    ~Controller() {
+        if (safety_thread_.joinable()) {
+            terminate_safety_thread_ = true;
+            safety_thread_.join();
+        }
     }
 
 private:
@@ -77,11 +88,11 @@ private:
         }
         
         try {
-            // 获取最新变换 (修正API调用)
+            // 获取最新变换
             auto transform = tf_buffer_->lookupTransform(
                 "base_footprint", 
                 current_target_.header.frame_id,
-                rclcpp::Time(0), // 使用rclcpp::Time而不是tf2::TimePointZero
+                rclcpp::Time(0),
                 rclcpp::Duration::from_seconds(0.1));
             
             // 转换目标点到base_footprint
@@ -104,6 +115,12 @@ private:
             cmd.linear.x = std::clamp(kp_linear_ * distance, 0.0, max_linear_vel_);
             cmd.angular.z = std::clamp(kp_angular_ * angle, -max_angular_vel_, max_angular_vel_);
             
+            // 将当前命令存入安全锁
+            {
+                std::lock_guard<std::mutex> lock(cmd_mutex_);
+                last_cmd_ = cmd;
+            }
+            
             RCLCPP_DEBUG(this->get_logger(), "Control cmd: lin=%.2f, ang=%.2f, dist=%.2f, ang=%.2f",
                          cmd.linear.x, cmd.angular.z, distance, angle);
             
@@ -115,6 +132,41 @@ private:
         } catch (const std::exception &e) {
             RCLCPP_ERROR(this->get_logger(), "Controller error: %s", e.what());
             cmd_pub_->publish(cmd);
+        }
+    }
+    
+    // 安全检查线程（独立于ROS定时器）
+    void safety_monitor() {
+        rclcpp::Rate rate(20); // 20Hz检查频率
+        while (rclcpp::ok() && !terminate_safety_thread_) {
+            geometry_msgs::msg::Twist current_cmd;
+            {
+                std::lock_guard<std::mutex> lock(cmd_mutex_);
+                current_cmd = last_cmd_;
+            }
+            
+            // 安全性检查1：速度指令是否超限
+            if (std::abs(current_cmd.linear.x) > max_linear_vel_ * 1.15 || 
+                std::abs(current_cmd.angular.z) > max_angular_vel_ * 1.15) {
+                RCLCPP_ERROR(this->get_logger(), 
+                            "Velocity command overflow! Lin: %.2f (max %.2f), Ang: %.2f (max %.2f)",
+                            current_cmd.linear.x, max_linear_vel_,
+                            current_cmd.angular.z, max_angular_vel_);
+                
+                // 发布停止指令
+                auto emergency_cmd = geometry_msgs::msg::Twist();
+                cmd_pub_->publish(emergency_cmd);
+                
+                // 重置指令
+                {
+                    std::lock_guard<std::mutex> lock(cmd_mutex_);
+                    last_cmd_ = emergency_cmd;
+                }
+            }
+            
+            // 可以添加更多安全检查...
+            
+            rate.sleep();
         }
     }
     
@@ -137,6 +189,12 @@ private:
     // TF2
     std::unique_ptr<tf2_ros::Buffer> tf_buffer_;
     std::shared_ptr<tf2_ros::TransformListener> tf_listener_;
+    
+    // 安全监测
+    geometry_msgs::msg::Twist last_cmd_;  // 最后发送的指令
+    std::mutex cmd_mutex_;               // 指令互斥锁
+    std::thread safety_thread_;          // 安全监测线程
+    std::atomic<bool> terminate_safety_thread_{false};
 };
 
 int main(int argc, char **argv) {

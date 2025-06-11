@@ -9,7 +9,11 @@ using namespace std::chrono_literals;
 
 class ImageProcessor : public rclcpp::Node {
 public:
-    ImageProcessor() : Node("image_processor"), frame_width_(640), frame_height_(480) {
+    ImageProcessor() : Node("image_processor"), 
+                       frame_width_(640), 
+                       frame_height_(480),
+                       processing_scale_(0.5) {  // 添加缩放因子参数
+        
         // 参数声明
         this->declare_parameter("h_min", 0);
         this->declare_parameter("s_min", 120);
@@ -18,6 +22,7 @@ public:
         this->declare_parameter("s_max", 255);
         this->declare_parameter("v_max", 255);
         this->declare_parameter("min_radius", 20);
+        this->declare_parameter("processing_scale", 0.5);  // 添加处理缩放参数
         
         // 获取参数
         this->get_parameter("h_min", h_min_);
@@ -27,6 +32,7 @@ public:
         this->get_parameter("s_max", s_max_);
         this->get_parameter("v_max", v_max_);
         this->get_parameter("min_radius", min_radius_);
+        this->get_parameter("processing_scale", processing_scale_);  // 获取缩放因子
         
         // 订阅RGB图像话题
         image_sub_ = image_transport::create_subscription(
@@ -43,6 +49,7 @@ public:
         RCLCPP_INFO(this->get_logger(), "Image Processor node started");
         RCLCPP_INFO(this->get_logger(), "Color parameters: H[%d-%d], S[%d-%d], V[%d-%d], Min radius: %d", 
                    h_min_, h_max_, s_min_, s_max_, v_min_, v_max_, min_radius_);
+        RCLCPP_INFO(this->get_logger(), "Processing scale: %.2f", processing_scale_);
     }
 
 private:
@@ -53,10 +60,21 @@ private:
             frame_width_ = frame.cols;
             frame_height_ = frame.rows;
             
+            // ==== 性能优化：图像降采样 ====
+            cv::Mat processed_frame;
+            if (processing_scale_ < 0.99 && processing_scale_ > 0.1) {
+                cv::resize(frame, processed_frame, 
+                           cv::Size(), processing_scale_, processing_scale_, 
+                           cv::INTER_AREA);
+            } else {
+                processed_frame = frame.clone();
+            }
+            // ============================
+            
             cv::Mat hsv, mask;
             
             // 转换为HSV空间并应用模糊
-            cv::cvtColor(frame, hsv, cv::COLOR_BGR2HSV);
+            cv::cvtColor(processed_frame, hsv, cv::COLOR_BGR2HSV);
             cv::GaussianBlur(hsv, hsv, cv::Size(9, 9), 2);
             
             // 颜色阈值
@@ -92,6 +110,11 @@ private:
                 float radius;
                 cv::minEnclosingCircle(max_contour, center, radius);
                 
+                // 应用缩放因子校正位置
+                center.x /= processing_scale_;
+                center.y /= processing_scale_;
+                radius /= processing_scale_;
+                
                 if (radius > min_radius_) {
                     // 发布目标中心位置
                     position_msg.point.x = center.x;
@@ -99,7 +122,7 @@ private:
                     position_msg.point.z = radius; // 存储半径表示目标大小
                     position_pub_->publish(position_msg);
                     
-                    // 可视化
+                    // 可视化 (在原始图像上绘制)
                     cv::circle(frame, center, static_cast<int>(radius), cv::Scalar(0, 255, 0), 2);
                     cv::circle(frame, center, 3, cv::Scalar(0, 0, 255), -1);
                     cv::putText(frame, "Target", 
@@ -112,6 +135,10 @@ private:
             if (debug_pub_.getNumSubscribers() > 0) {
                 cv::Mat color_mask;
                 cv::cvtColor(mask, color_mask, cv::COLOR_GRAY2BGR);
+                // 调整掩码大小以匹配原始帧
+                if (processing_scale_ < 0.99 && processing_scale_ > 0.1) {
+                    cv::resize(color_mask, color_mask, frame.size());
+                }
                 cv::Mat debug_frame;
                 cv::vconcat(frame, color_mask, debug_frame);
                 auto debug_msg = cv_bridge::CvImage(msg->header, "bgr8", debug_frame).toImageMsg();
@@ -129,6 +156,7 @@ private:
     int h_max_ = 0, s_max_ = 0, v_max_ = 0;
     int min_radius_ = 0;
     int frame_width_ = 0, frame_height_ = 0;
+    double processing_scale_ = 1.0;  // 添加处理缩放因子
     
     // ROS2接口
     image_transport::Subscriber image_sub_;
