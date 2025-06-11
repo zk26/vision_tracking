@@ -1,49 +1,60 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription
-from launch.substitutions import LaunchConfiguration
+from launch.actions import ExecuteProcess, TimerAction
 from launch_ros.actions import Node
-from launch.conditions import IfCondition
-from launch.actions import TimerAction
-import xacro
 
 def generate_launch_description():
-    # 获取包路径
-    tb3_gazebo_pkg = get_package_share_directory('turtlebot3_gazebo')
-    tb3_description_pkg = get_package_share_directory('turtlebot3_description')
+    # 获取当前功能包路径
+    pkg_dir = get_package_share_directory('vision_tracking')
     
-    # 获取世界文件路径
-    world_path = os.path.join(tb3_gazebo_pkg, 'worlds', 'turtlebot3_world.world')
+    # 使用项目内部的URDF文件
+    robot_urdf = os.path.join(pkg_dir, 'urdf', 'camera.urdf')  # 使用存在的camera.urdf
     
-    # 加载URDF模型并解析
-    urdf_path = os.path.join(tb3_description_pkg, 'urdf', 'turtlebot3_waffle.urdf')
-    with open(urdf_path, 'r') as infp:
-        robot_desc = infp.read()
+    # 检查URDF文件是否存在，如果不存在则使用备用方案
+    if not os.path.exists(robot_urdf):
+        # 创建简单的备用URDF描述
+        robot_desc = '''
+            <robot name="simple_robot">
+                <link name="base_link">
+                    <visual>
+                        <geometry>
+                            <box size="0.3 0.3 0.1"/>
+                        </geometry>
+                        <material name="blue">
+                            <color rgba="0 0 0.8 1"/>
+                        </material>
+                    </visual>
+                </link>
+            </robot>
+        '''
+    else:
+        with open(robot_urdf, 'r') as f:
+            robot_desc = f.read()
+    
+    # 使用Gazebo默认世界文件
+    world_path = os.path.join('/opt/ros/humble/share', 'turtlebot3_gazebo', 'worlds', 'empty.world')
     
     return LaunchDescription([
-        DeclareLaunchArgument(
-            'model',
-            default_value='waffle',
-            description='Turtlebot3 model'
+        # 设置必要的环境变量
+        ExecuteProcess(
+            cmd=['printenv', 'GAZEBO_MODEL_PATH'],
+            output='screen'
         ),
         
         # 启动Gazebo服务
         ExecuteProcess(
             cmd=['gazebo', '--verbose', world_path,
-                 '-s', 'libgazebo_ros_init.so', 
-                 '-s', 'libgazebo_ros_factory.so',
-                 '--model-database', f'file://{tb3_description_pkg}/models'],
+                 '-s', 'libgazebo_ros_init.so',
+                 '-s', 'libgazebo_ros_factory.so'],
             output='screen',
-            prefix='x-terminal-emulator -e',  # 强制在新终端打开
-            name='gazebo'
+            name='gazebo_server'
         ),
         
-        # 等待3秒后启动机器人状态发布器
+        # 启动机器人状态发布器 (5秒后启动)
         TimerAction(
-            period=3.0,
+            period=5.0,
             actions=[
-                # 机器人状态发布器
                 Node(
                     package='robot_state_publisher',
                     executable='robot_state_publisher',
@@ -53,50 +64,57 @@ def generate_launch_description():
                         'use_sim_time': True,
                         'robot_description': robot_desc
                     }]
-                ),
-                
-                # 在Gazebo中生成机器人实体
-                Node(
-                    package='gazebo_ros',
-                    executable='spawn_entity.py',
-                    arguments=[
-                        '-entity', 'turtlebot3_waffle',
-                        '-x', '0.0',
-                        '-y', '0.0',
-                        '-z', '0.01',
-                        '-topic', '/robot_description'
-                    ],
-                    output='screen',
-                    name='spawn_entity'
                 )
             ]
         ),
         
-        # 等待10秒后启动跟踪节点
+        # 在Gazebo中生成机器人实体 (7秒后启动)
+        TimerAction(
+            period=7.0,
+            actions=[
+                Node(
+                    package='gazebo_ros',
+                    executable='spawn_entity.py',
+                    arguments=[
+                        '-entity', 'vision_robot',
+                        '-x', '0.0', '-y', '0.0', '-z', '0.01',
+                        '-topic', '/robot_description'  # 使用话题而不是文件路径
+                    ],
+                    output='screen',
+                    name='spawn_robot'
+                )
+            ]
+        ),
+        
+        # 启动视觉跟踪节点 (10秒后启动)
         TimerAction(
             period=10.0,
             actions=[
-                # 启动您的跟踪节点
                 Node(
                     package='vision_tracking',
                     executable='image_processor',
-                    name='camera_node',
+                    name='image_processor',
                     output='screen',
-                    prefix='x-terminal-emulator -e'  # 在新终端打开
+                    parameters=[os.path.join(pkg_dir, 'params', 'color_params.yaml')]
                 ),
                 Node(
                     package='vision_tracking',
                     executable='depth_processor',
-                    name='ball_tracker',
-                    output='screen',
-                    prefix='x-terminal-emulator -e'  # 在新终端打开
+                    name='depth_processor',
+                    output='screen'
                 ),
                 Node(
                     package='vision_tracking',
                     executable='controller',
-                    name='commander',
+                    name='controller',
                     output='screen',
-                    prefix='x-terminal-emulator -e'  # 在新终端打开
+                    parameters=[
+                        {'kp_linear': 0.3, 
+                         'kp_angular': 0.8,
+                         'safe_distance': 0.5,
+                         'max_linear_vel': 0.5,
+                         'max_angular_vel': 1.0}
+                    ]
                 )
             ]
         )
