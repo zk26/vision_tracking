@@ -31,23 +31,39 @@ add_executable(controller src/controller.cpp)
 ament_target_dependencies(controller
   rclcpp geometry_msgs tf2_ros tf2_geometry_msgs)
 
-# Install executables
-install(TARGETS image_processor depth_processor controller
-  DESTINATION lib/${PROJECT_NAME})
+# ==== 关键修复部分 ==== #
 
-# Install launch files
-install(DIRECTORY launch/
-  DESTINATION share/${PROJECT_NAME}/launch
+# 安装可执行文件
+install(TARGETS 
+  image_processor depth_processor controller
+  DESTINATION lib/${PROJECT_NAME}
 )
 
-# Install config files
-install(DIRECTORY params/
+# 安装所有参数文件和目录
+install(
+  DIRECTORY params/
   DESTINATION share/${PROJECT_NAME}/params
 )
 
-# Install RViz config
-install(DIRECTORY rviz/
+# 安装其他资源
+install(
+  DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/launch
+)
+
+install(
+  DIRECTORY rviz/
   DESTINATION share/${PROJECT_NAME}/rviz
+)
+
+install(
+  DIRECTORY urdf/
+  DESTINATION share/${PROJECT_NAME}/urdf
+)
+
+install(
+  DIRECTORY include/
+  DESTINATION include/
 )
 
 ament_package()
