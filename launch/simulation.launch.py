@@ -1,15 +1,15 @@
 import os
-import xacro
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, ExecuteProcess, RegisterEventHandler, TimerAction
-from launch.event_handlers import OnProcessStart, OnProcessExit
+from launch.actions import DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch.conditions import IfCondition
+from launch.actions import TimerAction
+import xacro
 
 def generate_launch_description():
     # 获取包路径
-    vision_tracking_pkg = get_package_share_directory('vision_tracking')
     tb3_gazebo_pkg = get_package_share_directory('turtlebot3_gazebo')
     tb3_description_pkg = get_package_share_directory('turtlebot3_description')
     
@@ -21,55 +21,6 @@ def generate_launch_description():
     with open(urdf_path, 'r') as infp:
         robot_desc = infp.read()
     
-    # 创建Gazebo进程
-    gazebo = ExecuteProcess(
-        cmd=['gazebo', '--verbose', world_path, '-s', 'libgazebo_ros_init.so', '-s', 'libgazebo_ros_factory.so'],
-        output='screen',
-        name='gazebo'
-    )
-    
-    # 机器人状态发布器
-    robot_state_publisher = Node(
-        package='robot_state_publisher',
-        executable='robot_state_publisher',
-        name='robot_state_publisher',
-        output='screen',
-        parameters=[{
-            'use_sim_time': True,
-            'robot_description': robot_desc
-        }]
-    )
-    
-    # 在Gazebo中生成机器人实体
-    spawn_entity = Node(
-        package='gazebo_ros',
-        executable='spawn_entity.py',
-        name='spawn_entity',
-        arguments=[
-            '-entity', 'turtlebot3_waffle',
-            '-x', '0.0',
-            '-y', '0.0',
-            '-z', '0.01',
-            '-topic', '/robot_description'
-        ],
-        output='screen'
-    )
-    
-    # 创建事件处理
-    gazebo_handler = RegisterEventHandler(
-        event_handler=OnProcessStart(
-            target_action=gazebo,
-            on_start=[
-                TimerAction(
-                    period=3.0,  # 给Gazebo额外启动时间
-                    actions=[
-                        spawn_entity
-                    ]
-                )
-            ]
-        )
-    )
-    
     return LaunchDescription([
         DeclareLaunchArgument(
             'model',
@@ -77,41 +28,76 @@ def generate_launch_description():
             description='Turtlebot3 model'
         ),
         
-        gazebo,
-        robot_state_publisher,
-        gazebo_handler,
+        # 启动Gazebo服务
+        ExecuteProcess(
+            cmd=['gazebo', '--verbose', world_path,
+                 '-s', 'libgazebo_ros_init.so', 
+                 '-s', 'libgazebo_ros_factory.so',
+                 '--model-database', f'file://{tb3_description_pkg}/models'],
+            output='screen',
+            prefix='x-terminal-emulator -e',  # 强制在新终端打开
+            name='gazebo'
+        ),
         
-        # 在机器人生成后启动跟踪节点
-        RegisterEventHandler(
-            event_handler=OnProcessExit(
-                target_action=spawn_entity,
-                on_exit=[
-                    # 启动您的跟踪节点
-                    Node(
-                        package='vision_tracking',
-                        executable='camera_node',
-                        name='camera_node',
-                        output='screen'
-                    ),
-                    Node(
-                        package='vision_tracking',
-                        executable='ball_tracker',
-                        name='ball_tracker',
-                        output='screen'
-                    ),
-                    Node(
-                        package='vision_tracking',
-                        executable='commander',
-                        name='commander',
-                        output='screen'
-                    ),
-                    Node(
-                        package='vision_tracking',
-                        executable='drive_node',
-                        name='drive_node',
-                        output='screen'
-                    )
-                ]
-            )
+        # 等待3秒后启动机器人状态发布器
+        TimerAction(
+            period=3.0,
+            actions=[
+                # 机器人状态发布器
+                Node(
+                    package='robot_state_publisher',
+                    executable='robot_state_publisher',
+                    name='robot_state_publisher',
+                    output='screen',
+                    parameters=[{
+                        'use_sim_time': True,
+                        'robot_description': robot_desc
+                    }]
+                ),
+                
+                # 在Gazebo中生成机器人实体
+                Node(
+                    package='gazebo_ros',
+                    executable='spawn_entity.py',
+                    arguments=[
+                        '-entity', 'turtlebot3_waffle',
+                        '-x', '0.0',
+                        '-y', '0.0',
+                        '-z', '0.01',
+                        '-topic', '/robot_description'
+                    ],
+                    output='screen',
+                    name='spawn_entity'
+                )
+            ]
+        ),
+        
+        # 等待10秒后启动跟踪节点
+        TimerAction(
+            period=10.0,
+            actions=[
+                # 启动您的跟踪节点
+                Node(
+                    package='vision_tracking',
+                    executable='image_processor',
+                    name='camera_node',
+                    output='screen',
+                    prefix='x-terminal-emulator -e'  # 在新终端打开
+                ),
+                Node(
+                    package='vision_tracking',
+                    executable='depth_processor',
+                    name='ball_tracker',
+                    output='screen',
+                    prefix='x-terminal-emulator -e'  # 在新终端打开
+                ),
+                Node(
+                    package='vision_tracking',
+                    executable='controller',
+                    name='commander',
+                    output='screen',
+                    prefix='x-terminal-emulator -e'  # 在新终端打开
+                )
+            ]
         )
     ])
