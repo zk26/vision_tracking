@@ -1,0 +1,12 @@
+/home/lvu/ros2_ws/src/vision_tracking/build/CMakeFiles/uninstall.dir
+/home/lvu/ros2_ws/src/vision_tracking/build/CMakeFiles/vision_tracking_uninstall.dir
+/home/lvu/ros2_ws/src/vision_tracking/build/CMakeFiles/image_processor.dir
+/home/lvu/ros2_ws/src/vision_tracking/build/CMakeFiles/depth_processor.dir
+/home/lvu/ros2_ws/src/vision_tracking/build/CMakeFiles/controller.dir
+/home/lvu/ros2_ws/src/vision_tracking/build/CMakeFiles/test.dir
+/home/lvu/ros2_ws/src/vision_tracking/build/CMakeFiles/edit_cache.dir
+/home/lvu/ros2_ws/src/vision_tracking/build/CMakeFiles/rebuild_cache.dir
+/home/lvu/ros2_ws/src/vision_tracking/build/CMakeFiles/list_install_components.dir
+/home/lvu/ros2_ws/src/vision_tracking/build/CMakeFiles/install.dir
+/home/lvu/ros2_ws/src/vision_tracking/build/CMakeFiles/install/local.dir
+/home/lvu/ros2_ws/src/vision_tracking/build/CMakeFiles/install/strip.dir
