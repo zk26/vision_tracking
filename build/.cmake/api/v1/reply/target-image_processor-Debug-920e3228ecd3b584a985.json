@@ -14,13 +14,26 @@
 			"install",
 			"target_link_libraries",
 			"ament_target_dependencies",
+			"add_definitions",
+			"include",
+			"dart_traverse_components",
+			"dart_package_init",
+			"find_package",
 			"include_directories",
 			"target_include_directories"
 		],
 		"files" : 
 		[
 			"CMakeLists.txt",
-			"/opt/ros/humble/share/ament_cmake_target_dependencies/cmake/ament_target_dependencies.cmake"
+			"/opt/ros/humble/share/ament_cmake_target_dependencies/cmake/ament_target_dependencies.cmake",
+			"/usr/share/dart/cmake/DARTFindBoost.cmake",
+			"/usr/share/dart/cmake/dart_dartComponent.cmake",
+			"/usr/share/dart/cmake/DARTConfig.cmake",
+			"/usr/lib/x86_64-linux-gnu/cmake/gazebo/gazebo-config.cmake",
+			"/opt/ros/humble/share/gazebo_dev/cmake/gazebo_dev-extras.cmake",
+			"/opt/ros/humble/share/gazebo_dev/cmake/gazebo_devConfig.cmake",
+			"/opt/ros/humble/share/gazebo_ros/cmake/ament_cmake_export_dependencies-extras.cmake",
+			"/opt/ros/humble/share/gazebo_ros/cmake/gazebo_rosConfig.cmake"
 		],
 		"nodes" : 
 		[
@@ -30,19 +43,19 @@
 			{
 				"command" : 0,
 				"file" : 0,
-				"line" : 23,
+				"line" : 25,
 				"parent" : 0
 			},
 			{
 				"command" : 1,
 				"file" : 0,
-				"line" : 57,
+				"line" : 59,
 				"parent" : 0
 			},
 			{
 				"command" : 3,
 				"file" : 0,
-				"line" : 24,
+				"line" : 26,
 				"parent" : 0
 			},
 			{
@@ -54,17 +67,127 @@
 			{
 				"command" : 2,
 				"file" : 0,
-				"line" : 26,
+				"line" : 28,
 				"parent" : 0
 			},
 			{
-				"command" : 4,
+				"command" : 8,
 				"file" : 0,
-				"line" : 20,
+				"line" : 18,
 				"parent" : 0
+			},
+			{
+				"file" : 9,
+				"parent" : 6
 			},
 			{
 				"command" : 5,
+				"file" : 9,
+				"line" : 41,
+				"parent" : 7
+			},
+			{
+				"file" : 8,
+				"parent" : 8
+			},
+			{
+				"command" : 8,
+				"file" : 8,
+				"line" : 21,
+				"parent" : 9
+			},
+			{
+				"file" : 7,
+				"parent" : 10
+			},
+			{
+				"command" : 5,
+				"file" : 7,
+				"line" : 41,
+				"parent" : 11
+			},
+			{
+				"file" : 6,
+				"parent" : 12
+			},
+			{
+				"command" : 8,
+				"file" : 6,
+				"line" : 3,
+				"parent" : 13
+			},
+			{
+				"file" : 5,
+				"parent" : 14
+			},
+			{
+				"command" : 8,
+				"file" : 5,
+				"line" : 166,
+				"parent" : 15
+			},
+			{
+				"file" : 4,
+				"parent" : 16
+			},
+			{
+				"command" : 7,
+				"file" : 4,
+				"line" : 181,
+				"parent" : 17
+			},
+			{
+				"command" : 6,
+				"file" : 4,
+				"line" : 133,
+				"parent" : 18
+			},
+			{
+				"command" : 5,
+				"file" : 4,
+				"line" : 73,
+				"parent" : 19
+			},
+			{
+				"file" : 3,
+				"parent" : 20
+			},
+			{
+				"command" : 5,
+				"file" : 3,
+				"line" : 6,
+				"parent" : 21
+			},
+			{
+				"file" : 2,
+				"parent" : 22
+			},
+			{
+				"command" : 4,
+				"file" : 2,
+				"line" : 13,
+				"parent" : 23
+			},
+			{
+				"command" : 4,
+				"file" : 5,
+				"line" : 142,
+				"parent" : 15
+			},
+			{
+				"command" : 4,
+				"file" : 5,
+				"line" : 148,
+				"parent" : 15
+			},
+			{
+				"command" : 9,
+				"file" : 0,
+				"line" : 22,
+				"parent" : 0
+			},
+			{
+				"command" : 10,
 				"file" : 1,
 				"line" : 141,
 				"parent" : 3
@@ -83,8 +206,20 @@
 			"defines" : 
 			[
 				{
+					"backtrace" : 24,
+					"define" : "BOOST_TEST_DYN_LINK"
+				},
+				{
 					"backtrace" : 4,
 					"define" : "DEFAULT_RMW_IMPLEMENTATION=rmw_fastrtps_cpp"
+				},
+				{
+					"backtrace" : 25,
+					"define" : "LIBBULLET_VERSION=3.05"
+				},
+				{
+					"backtrace" : 26,
+					"define" : "LIBBULLET_VERSION_GT_282"
 				},
 				{
 					"backtrace" : 4,
@@ -94,31 +229,31 @@
 			"includes" : 
 			[
 				{
-					"backtrace" : 6,
+					"backtrace" : 27,
 					"path" : "/home/lvu/ros2_ws/src/vision_tracking/include"
 				},
 				{
-					"backtrace" : 7,
+					"backtrace" : 28,
 					"isSystem" : true,
 					"path" : "/opt/ros/humble/include/rclcpp"
 				},
 				{
-					"backtrace" : 7,
+					"backtrace" : 28,
 					"isSystem" : true,
 					"path" : "/opt/ros/humble/include/cv_bridge"
 				},
 				{
-					"backtrace" : 7,
+					"backtrace" : 28,
 					"isSystem" : true,
 					"path" : "/opt/ros/humble/include/image_transport"
 				},
 				{
-					"backtrace" : 7,
+					"backtrace" : 28,
 					"isSystem" : true,
 					"path" : "/opt/ros/humble/include/sensor_msgs"
 				},
 				{
-					"backtrace" : 7,
+					"backtrace" : 28,
 					"isSystem" : true,
 					"path" : "/opt/ros/humble/include/geometry_msgs"
 				},

@@ -2,9 +2,7 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import (ExecuteProcess, TimerAction, 
-                            DeclareLaunchArgument)
-from launch.substitutions import LaunchConfiguration, PythonExpression
+from launch.actions import ExecuteProcess, TimerAction
 from launch_ros.actions import Node
 import xacro
 
@@ -12,59 +10,39 @@ def generate_launch_description():
     # 获取包路径
     pkg_dir = get_package_share_directory('vision_tracking')
     
-    # 设置环境变量解决Gazebo问题
-    env_vars = {
-        'HOME': os.environ['HOME'],  # 添加缺失的HOME变量
-        'GAZEBO_MODEL_PATH': os.path.join(os.environ['HOME'], '.gazebo/models'),
-        'GAZEBO_RESOURCE_PATH': '/usr/share/gazebo-11',
-        'LIBGL_ALWAYS_SOFTWARE': '1',  # 解决渲染问题
-        'MESA_GL_VERSION_OVERRIDE': '3.3'  # 兼容性设置
-    }
+    # 处理 Xacro 文件
+    urdf_path = os.path.join(pkg_dir, 'urdf', 'robot.xacro')
+    robot_description = xacro.process_file(urdf_path).toxml()
     
-    # 更安全的清理命令
-    cleanup_commands = [
-        'if [ -f ~/.gazebo/lock ]; then rm -f ~/.gazebo/lock; fi',
-        'pkill -f gzserver || true',
-        'pkill -f gzclient || true',
-        'find /dev/shm -name "rtps_*" -delete || true'
-    ]
+    # 资源文件路径
+    world_path = os.path.join(pkg_dir, 'worlds', 'empty.world')
+    rviz_config = os.path.join(pkg_dir, 'rviz', 'tracking.rviz')
+    color_params = os.path.join(pkg_dir, 'params', 'color_params.yaml')
     
-    # 机器人xacro文件路径
-    xacro_path = os.path.join(pkg_dir, 'urdf', 'robot.xacro')
+    # 基础环境变量
+    env_vars = dict(os.environ)
+    env_vars.update({
+        'LIBGL_ALWAYS_SOFTWARE': '1',
+        'ROS_DOMAIN_ID': '0'
+    })
     
-    # 使用xacro处理机器人描述
-    robot_description = xacro.process_file(xacro_path).toxml()
-    
-    # 获取spawn_entity的完整路径
-    spawn_entity_path = PythonExpression([
-        '"',
-        os.path.join(get_package_share_directory('gazebo_ros'), 'lib'),
-        '/gazebo_ros/spawn_entity.py"'
-    ])
+    # 确保关键ROS变量存在
+    required_vars = ['AMENT_PREFIX_PATH', 'ROS_DISTRO', 'PYTHONPATH']
+    for var in required_vars:
+        if var not in env_vars:
+            print(f"WARNING: Required environment variable {var} not set")
+            env_vars[var] = env_vars.get(var, '/opt/ros/humble')
     
     return LaunchDescription([
-        # 声明参数
-        DeclareLaunchArgument('world', default_value='/usr/share/gazebo-11/worlds/empty.world',
-                              description='Gazebo world file'),
-        
-        # 执行清理命令
+        # 启动 Gazebo 服务器
         ExecuteProcess(
-            cmd=['bash', '-c', '; '.join(cleanup_commands)],
-            output='screen',
-            shell=True
-        ),
-        
-        # 启动Gazebo服务器
-        ExecuteProcess(
-            cmd=['gazebo', '--verbose', LaunchConfiguration('world'),
-                 '-s', 'libgazebo_ros_init.so',
-                 '-s', 'libgazebo_ros_factory.so'],
+            cmd=['gzserver', '--verbose', world_path],
             output='screen',
             name='gazebo_server',
             env=env_vars
         ),
         
-        # 机器人状态发布器
+        # 机器人状态发布器 - 仅传递必要参数
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
@@ -73,66 +51,76 @@ def generate_launch_description():
             parameters=[{
                 'robot_description': robot_description,
                 'use_sim_time': True
-            }]
+            }],
+            # 不覆盖环境变量
         ),
         
-        # 使用spawn_entity.py的完整路径
-        ExecuteProcess(
-            cmd=['python3', spawn_entity_path,
-                 '-entity', 'vision_tracking_robot',
-                 '-topic', 'robot_description',
-                 '-x', '0.0', '-y', '0.0', '-z', '0.1',
-                 '-Y', '0.0'],
-            output='screen',
-            name='spawn_robot',
-            env=env_vars
-        ),
-        
-        # 启动Gazebo客户端 (延迟10秒等待服务器稳定)
+        # 生成机器人实体 (延迟3秒)
         TimerAction(
-            period=10.0,
+            period=3.0,
             actions=[
-                ExecuteProcess(
-                    cmd=['gzclient'],
+                Node(
+                    package='gazebo_ros',
+                    executable='spawn_entity.py',
+                    name='spawn_robot',
+                    arguments=[
+                        '-entity', 'vision_tracking_robot',
+                        '-topic', 'robot_description',
+                        '-x', '0.0', '-y', '0.0', '-z', '0.1',
+                        '-Y', '0.0'
+                    ],
                     output='screen',
-                    name='gazebo_client',
-                    env=env_vars
+                    # 不覆盖环境变量
                 )
             ]
         ),
         
-        # 视觉处理节点 (延迟15秒等待Gazebo完全启动)
+        # 图像处理节点
+        Node(
+            package='vision_tracking',
+            executable='image_processor',
+            name='image_processor',
+            output='screen',
+            parameters=[color_params]
+        ),
+        
+        # 深度处理节点
+        Node(
+            package='vision_tracking',
+            executable='depth_processor',
+            name='depth_processor',
+            output='screen',
+            parameters=[{'use_sim_time': True}]
+        ),
+        
+        # 控制器节点
+        Node(
+            package='vision_tracking',
+            executable='controller',
+            name='controller',
+            output='screen',
+            parameters=[
+                {'use_sim_time': True},
+                {'kp_linear': 0.3},
+                {'kp_angular': 0.8},
+                {'safe_distance': 0.5},
+                {'target_lost_timeout': 2.0},
+                {'max_linear_vel': 0.5},
+                {'max_angular_vel': 1.0}
+            ]
+        ),
+        
+        # RViz 可视化 (延迟10秒)
         TimerAction(
-            period=15.0,
+            period=10.0,
             actions=[
                 Node(
-                    package='vision_tracking',
-                    executable='image_processor',
-                    name='image_processor',
-                    output='screen',
-                    parameters=[os.path.join(pkg_dir, 'params', 'color_params.yaml')]
-                ),
-                Node(
-                    package='vision_tracking',
-                    executable='depth_processor',
-                    name='depth_processor',
+                    package='rviz2',
+                    executable='rviz2',
+                    name='rviz2',
+                    arguments=['-d', rviz_config],
                     output='screen',
                     parameters=[{'use_sim_time': True}]
-                ),
-                Node(
-                    package='vision_tracking',
-                    executable='controller',
-                    name='controller',
-                    output='screen',
-                    parameters=[
-                        {'use_sim_time': True,
-                         'kp_linear': 0.3, 
-                         'kp_angular': 0.8,
-                         'safe_distance': 0.5,
-                         'target_lost_timeout': 2.0,
-                         'max_linear_vel': 0.5,
-                         'max_angular_vel': 1.0}
-                    ]
                 )
             ]
         )

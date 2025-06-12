@@ -15,6 +15,8 @@ find_package(image_geometry REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(tf2_geometry_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
+find_package(gazebo_ros REQUIRED)
+find_package(robot_state_publisher REQUIRED)
 
 # ==== 头文件包含设置 ==== #
 include_directories(include)  # 添加全局包含路径
