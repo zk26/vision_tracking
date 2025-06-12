@@ -647,7 +647,7 @@ _lib:FILEPATH=/opt/ros/humble/lib/liburdf.so
 action_msgs_DIR:PATH=/opt/ros/humble/share/action_msgs/cmake
 
 //The directory containing a CMake configuration file for ament_cmake.
-ament_cmake_DIR:PATH=/opt/ros/humble/share/ament_cmake/cmake
+ament_cmake_DIR:PATH=ament_cmake_DIR-NOTFOUND
 
 //The directory containing a CMake configuration file for ament_cmake_core.
 ament_cmake_core_DIR:PATH=/opt/ros/humble/share/ament_cmake_core/cmake

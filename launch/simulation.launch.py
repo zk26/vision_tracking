@@ -28,7 +28,7 @@ def generate_launch_description():
         rviz_config = find_resource("rviz/tracking.rviz")
         color_params = find_resource("params/color_params.yaml")
     except FileNotFoundError as e:
-        return LaunchDescription([Abort(reason=str(e))])
+        return LaunchDescription([Abort(reason=f"资源未找到: {str(e)}")])
 
     try:
         robot_description = xacro.process_file(urdf_path).toxml()
@@ -37,11 +37,12 @@ def generate_launch_description():
 
     env_vars = dict(os.environ)
     env_vars.update({
-        'LIBGL_ALWAYS_SOFTWARE': '1',
-        'ROS_DOMAIN_ID': '0'
+        'LIBGL_ALWAYS_SOFTWARE': '1',  # 解决Gazebo渲染问题
+        'ROS_DOMAIN_ID': '0'          # 避免多机器人干扰
     })
 
     return LaunchDescription([
+        # 启动Gazebo服务器
         ExecuteProcess(
             cmd=['gzserver', '--verbose', world_path],
             output='screen',
@@ -49,6 +50,7 @@ def generate_launch_description():
             env=env_vars
         ),
 
+        # 发布机器人状态
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
@@ -56,11 +58,12 @@ def generate_launch_description():
             output='screen',
             parameters=[
                 {'robot_description': robot_description},
-                {'use_sim_time': True}
+                {'use_sim_time': True}  # 使用仿真时间
             ],
             env=env_vars
         ),
 
+        # 延迟生成机器人实体（等待Gazebo初始化）
         TimerAction(
             period=3.0,
             actions=[
@@ -69,53 +72,57 @@ def generate_launch_description():
                     executable='spawn_entity.py',
                     name='spawn_robot',
                     arguments=[
-                        '-entity', 'vision_tracking_robot',
-                        '-topic', 'robot_description',
-                        '-x', '0.0', '-y', '0.0', '-z', '0.1',
-                        '-Y', '0.0'
+                        '-entity', 'vision_tracking_robot',  # 机器人实体名
+                        '-topic', 'robot_description',       # 从robot_description话题获取URDF
+                        '-x', '0.0', '-y', '0.0', '-z', '0.1',  # 初始位置（z=0.1避免地面穿透）
+                        '-Y', '0.0'                           # 初始朝向（无旋转）
                     ],
                     output='screen'
                 )
             ]
         ),
 
+        # 图像处理节点（依赖颜色参数）
         Node(
             package='vision_tracking',
             executable='image_processor',
             name='image_processor',
             output='screen',
             parameters=[
-                color_params,
-                {'use_sim_time': True}
+                color_params,  # 加载颜色阈值参数
+                {'use_sim_time': True}  # 使用仿真时间
             ]
         ),
 
+        # 深度处理节点（依赖仿真时间）
         Node(
             package='vision_tracking',
             executable='depth_processor',
             name='depth_processor',
             output='screen',
             parameters=[
-                {'use_sim_time': True}
+                {'use_sim_time': True}  # 使用仿真时间
             ]
         ),
 
+        # 控制节点（依赖仿真时间和参数）
         Node(
             package='vision_tracking',
             executable='controller',
             name='controller',
             output='screen',
             parameters=[
-                {'use_sim_time': True},
-                {'kp_linear': 0.3},
-                {'kp_angular': 0.8},
-                {'safe_distance': 0.5},
-                {'target_lost_timeout': 2.0},
-                {'max_linear_vel': 0.5},
-                {'max_angular_vel': 1.0}
+                {'use_sim_time': True},  # 使用仿真时间
+                {'kp_linear': 0.3},      # 线速度比例系数
+                {'kp_angular': 0.8},     # 角速度比例系数
+                {'safe_distance': 0.5},  # 安全距离（米）
+                {'target_lost_timeout': 2.0},  # 目标丢失超时时间（秒）
+                {'max_linear_vel': 0.5},  # 最大线速度（米/秒）
+                {'max_angular_vel': 1.0}  # 最大角速度（弧度/秒）
             ]
         ),
 
+        # RViz可视化（延迟启动确保节点就绪）
         TimerAction(
             period=10.0,
             actions=[
@@ -123,10 +130,10 @@ def generate_launch_description():
                     package='rviz2',
                     executable='rviz2',
                     name='rviz2',
-                    arguments=['-d', rviz_config],
+                    arguments=['-d', rviz_config],  # 加载RViz配置
                     output='screen',
                     parameters=[
-                        {'use_sim_time': True}
+                        {'use_sim_time': True}  # 使用仿真时间
                     ]
                 )
             ]
