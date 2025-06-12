@@ -88,6 +88,11 @@ install(
   DESTINATION include/
 )
 
+install(
+  DIRECTORY worlds/
+  DESTINATION share/${PROJECT_NAME}/worlds
+)
+
 # 安装头文件
 install(
   DIRECTORY include/

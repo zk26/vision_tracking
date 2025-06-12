@@ -7,17 +7,40 @@ from launch_ros.actions import Node
 import xacro
 
 def generate_launch_description():
-    # 获取包路径
+    # 获取包路径 (使用可靠方法)
     pkg_dir = get_package_share_directory('vision_tracking')
     
-    # 处理 Xacro 文件
-    urdf_path = os.path.join(pkg_dir, 'urdf', 'robot.xacro')
-    robot_description = xacro.process_file(urdf_path).toxml()
+    # 查找资源文件 (优先使用安装路径)
+    def find_resource(relative_path):
+        # 检查安装目录
+        install_path = os.path.join(pkg_dir, relative_path)
+        if os.path.exists(install_path):
+            return install_path
+        
+        # 检查源目录
+        source_path = os.path.join(os.path.dirname(__file__), "../", relative_path)
+        if os.path.exists(source_path):
+            return os.path.abspath(source_path)
+        
+        # 未找到文件
+        raise FileNotFoundError(f"找不到资源文件: {relative_path}")
     
-    # 资源文件路径
-    world_path = os.path.join(pkg_dir, 'worlds', 'empty.world')
-    rviz_config = os.path.join(pkg_dir, 'rviz', 'tracking.rviz')
-    color_params = os.path.join(pkg_dir, 'params', 'color_params.yaml')
+    # 获取资源文件
+    try:
+        urdf_path = find_resource("urdf/robot.xacro")
+        world_path = find_resource("worlds/empty.world")
+        rviz_config = find_resource("rviz/tracking.rviz")
+        color_params = find_resource("params/color_params.yaml")
+    except FileNotFoundError as e:
+        print(f"错误: {e}")
+        exit(1)
+    
+    # 处理 Xacro 文件
+    try:
+        robot_description = xacro.process_file(urdf_path).toxml()
+    except Exception as e:
+        print(f"URDF处理错误: {e}")
+        exit(1)
     
     # 基础环境变量
     env_vars = dict(os.environ)
@@ -25,13 +48,6 @@ def generate_launch_description():
         'LIBGL_ALWAYS_SOFTWARE': '1',
         'ROS_DOMAIN_ID': '0'
     })
-    
-    # 确保关键ROS变量存在
-    required_vars = ['AMENT_PREFIX_PATH', 'ROS_DISTRO', 'PYTHONPATH']
-    for var in required_vars:
-        if var not in env_vars:
-            print(f"WARNING: Required environment variable {var} not set")
-            env_vars[var] = env_vars.get(var, '/opt/ros/humble')
     
     return LaunchDescription([
         # 启动 Gazebo 服务器
@@ -42,7 +58,7 @@ def generate_launch_description():
             env=env_vars
         ),
         
-        # 机器人状态发布器 - 仅传递必要参数
+        # 机器人状态发布器
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
@@ -52,7 +68,7 @@ def generate_launch_description():
                 'robot_description': robot_description,
                 'use_sim_time': True
             }],
-            # 不覆盖环境变量
+            env=env_vars
         ),
         
         # 生成机器人实体 (延迟3秒)
