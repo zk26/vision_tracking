@@ -2,15 +2,10 @@
 import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import (ExecuteProcess, TimerAction, RegisterEventHandler,
+from launch.actions import (ExecuteProcess, TimerAction, 
                             DeclareLaunchArgument)
-from launch.event_handlers import OnProcessStart, OnProcessExit
-from launch.substitutions import (LaunchConfiguration, PathJoinSubstitution,
-                                  Command, PythonExpression)
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
-import launch_ros
-from launch.actions import IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
 import xacro
 
 def generate_launch_description():
@@ -19,18 +14,19 @@ def generate_launch_description():
     
     # 设置环境变量解决Gazebo问题
     env_vars = {
+        'HOME': os.environ['HOME'],  # 添加缺失的HOME变量
         'GAZEBO_MODEL_PATH': os.path.join(os.environ['HOME'], '.gazebo/models'),
         'GAZEBO_RESOURCE_PATH': '/usr/share/gazebo-11',
         'LIBGL_ALWAYS_SOFTWARE': '1',  # 解决渲染问题
         'MESA_GL_VERSION_OVERRIDE': '3.3'  # 兼容性设置
     }
     
-    # 清理命令 (确保没有残留进程)
+    # 更安全的清理命令
     cleanup_commands = [
-        'pkill -f gzserver',
-        'pkill -f gzclient',
-        'rm -rf ~/.gazebo/lock',
-        'find /dev/shm -name "rtps_*" -delete'
+        'if [ -f ~/.gazebo/lock ]; then rm -f ~/.gazebo/lock; fi',
+        'pkill -f gzserver || true',
+        'pkill -f gzclient || true',
+        'find /dev/shm -name "rtps_*" -delete || true'
     ]
     
     # 机器人xacro文件路径
@@ -38,6 +34,13 @@ def generate_launch_description():
     
     # 使用xacro处理机器人描述
     robot_description = xacro.process_file(xacro_path).toxml()
+    
+    # 获取spawn_entity的完整路径
+    spawn_entity_path = PythonExpression([
+        '"',
+        os.path.join(get_package_share_directory('gazebo_ros'), 'lib'),
+        '/gazebo_ros/spawn_entity.py"'
+    ])
     
     return LaunchDescription([
         # 声明参数
@@ -47,7 +50,8 @@ def generate_launch_description():
         # 执行清理命令
         ExecuteProcess(
             cmd=['bash', '-c', '; '.join(cleanup_commands)],
-            output='screen'
+            output='screen',
+            shell=True
         ),
         
         # 启动Gazebo服务器
@@ -57,14 +61,6 @@ def generate_launch_description():
                  '-s', 'libgazebo_ros_factory.so'],
             output='screen',
             name='gazebo_server',
-            env=env_vars
-        ),
-        
-        # 启动Gazebo客户端
-        ExecuteProcess(
-            cmd=['gzclient'],
-            output='screen',
-            name='gazebo_client',
             env=env_vars
         ),
         
@@ -80,24 +76,34 @@ def generate_launch_description():
             }]
         ),
         
-        # 在Gazebo中生成机器人实体
-        Node(
-            package='gazebo_ros',
-            executable='spawn_entity.py',
-            name='spawn_robot',
-            arguments=[
-                '-entity', 'vision_tracking_robot',
-                '-topic', 'robot_description',  # 从话题获取URDF
-                '-x', '0.0', '-y', '0.0', '-z', '0.1',
-                '-Y', '0.0'
-            ],
+        # 使用spawn_entity.py的完整路径
+        ExecuteProcess(
+            cmd=['python3', spawn_entity_path,
+                 '-entity', 'vision_tracking_robot',
+                 '-topic', 'robot_description',
+                 '-x', '0.0', '-y', '0.0', '-z', '0.1',
+                 '-Y', '0.0'],
             output='screen',
+            name='spawn_robot',
             env=env_vars
         ),
         
-        # 视觉处理节点 (5秒后启动)
+        # 启动Gazebo客户端 (延迟10秒等待服务器稳定)
         TimerAction(
-            period=5.0,
+            period=10.0,
+            actions=[
+                ExecuteProcess(
+                    cmd=['gzclient'],
+                    output='screen',
+                    name='gazebo_client',
+                    env=env_vars
+                )
+            ]
+        ),
+        
+        # 视觉处理节点 (延迟15秒等待Gazebo完全启动)
+        TimerAction(
+            period=15.0,
             actions=[
                 Node(
                     package='vision_tracking',
