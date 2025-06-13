@@ -26,12 +26,12 @@ def generate_launch_description():
             output='screen'
         ),
 
-        # Step 3: Gazebo Client，用 X11
-        ExecuteProcess(
-            cmd=['gzclient'],
-            output='screen',
-            additional_env={'QT_QPA_PLATFORM': 'xcb'}
-        ),
+        # # Step 3: Gazebo Client，用 X11
+        # ExecuteProcess(
+        #     cmd=['gzclient'],
+        #     output='screen',
+        #     additional_env={'QT_QPA_PLATFORM': 'xcb'}
+        # ),
 
         # Step 4: spawn_entity，加载机器人
         ExecuteProcess(
