@@ -1,106 +1,105 @@
-<?xml version="1.0"?>
-<robot name="vision_tracking_robot" xmlns:xacro="http://www.ros.org/wiki/xacro">
+<?xml version="1.0" ?>
+<robot name="vision_tracking_robot">
 
-  <!-- 基础参数 -->
-  <xacro:property name="base_length" value="0.4" />
-  <xacro:property name="base_width" value="0.3" />
-  <xacro:property name="base_height" value="0.15" />
-  <xacro:property name="wheel_radius" value="0.08" />
-  <xacro:property name="wheel_width" value="0.04" />
-  <xacro:property name="wheel_y_offset" value="0.15" />
-  <xacro:property name="camera_x_offset" value="0.2" />
-  <xacro:property name="camera_z_offset" value="0.1" />
+  <!-- dummy 根链接，解决root惯性警告 -->
+  <link name="dummy_root_link">
+    <inertial>
+      <mass value="0.001"/>
+      <inertia ixx="0.00001" ixy="0" ixz="0" iyy="0.00001" iyz="0" izz="0.00001"/>
+    </inertial>
+  </link>
+
+  <joint name="dummy_root_to_base" type="fixed">
+    <parent link="dummy_root_link"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0" rpy="0 0 0"/>
+  </joint>
 
   <!-- 机器人底盘 -->
   <link name="base_link">
     <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="${base_length} ${base_width} ${base_height}"/>
+        <box size="0.4 0.3 0.15"/>
       </geometry>
       <material name="blue">
         <color rgba="0.1 0.3 0.8 1.0"/>
       </material>
     </visual>
     <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="${base_length} ${base_width} ${base_height}"/>
+        <box size="0.4 0.3 0.15"/>
       </geometry>
     </collision>
     <inertial>
       <mass value="5.0"/>
-      <inertia ixx="0.1" ixy="0.0" ixz="0.0" iyy="0.1" iyz="0.0" izz="0.1"/> 
+      <inertia ixx="0.1" ixy="0.0" ixz="0.0" iyy="0.1" iyz="0.0" izz="0.1"/>
     </inertial>
   </link>
 
   <!-- 左轮 -->
   <link name="left_wheel">
     <visual>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
       <geometry>
-        <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        <cylinder length="0.04" radius="0.08"/>
       </geometry>
-      <!-- 关键修改：添加自身旋转 -->
-      <origin rpy="1.5708 0 0" xyz="0 0 0"/>
       <material name="black">
         <color rgba="0.1 0.1 0.1 1.0"/>
       </material>
     </visual>
     <collision>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
       <geometry>
-        <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        <cylinder length="0.04" radius="0.08"/>
       </geometry>
-      <!-- 关键修改：添加自身旋转 -->
-      <origin rpy="1.5708 0 0" xyz="0 0 0"/>
-    </collision>
-    <inertial>
-      <mass value="0.5"/>
-      <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>  
-    </inertial>
-  </link>
-
-  <joint name="left_wheel_joint" type="continuous">
-    <parent link="base_link"/>
-    <child link="left_wheel"/>
-    <!-- 关键修改：移除rpy旋转 -->
-    <origin xyz="0.0 ${wheel_y_offset} -${base_height/2}"/>
-    <axis xyz="0 1 0"/>
-  </joint>
-
-  <!-- 右轮 -->
-  <link name="right_wheel">
-    <visual>
-      <geometry>
-        <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
-      </geometry>
-      <!-- 关键修改：添加自身旋转 -->
-      <origin rpy="1.5708 0 0" xyz="0 0 0"/>
-      <material name="black">
-        <color rgba="0.1 0.1 0.1 1.0"/>
-      </material>
-    </visual>
-    <collision>
-      <geometry>
-        <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
-      </geometry>
-      <!-- 关键修改：添加自身旋转 -->
-      <origin rpy="1.5708 0 0" xyz="0 0 0"/>
     </collision>
     <inertial>
       <mass value="0.5"/>
       <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
     </inertial>
   </link>
+  <joint name="left_wheel_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="left_wheel"/>
+    <origin xyz="0.0 0.15 -0.05" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+  </joint>
 
+  <!-- 右轮 -->
+  <link name="right_wheel">
+    <visual>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder length="0.04" radius="0.08"/>
+      </geometry>
+      <material name="black">
+        <color rgba="0.1 0.1 0.1 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="1.5708 0 0"/>
+      <geometry>
+        <cylinder length="0.04" radius="0.08"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5"/>
+      <inertia ixx="0.001" ixy="0.0" ixz="0.0" iyy="0.001" iyz="0.0" izz="0.001"/>
+    </inertial>
+  </link>
   <joint name="right_wheel_joint" type="continuous">
     <parent link="base_link"/>
     <child link="right_wheel"/>
-    <!-- 关键修改：移除rpy旋转 -->
-    <origin xyz="0.0 -${wheel_y_offset} -${base_height/2}"/>
+    <origin xyz="0.0 -0.15 -0.05" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
   </joint>
 
   <!-- 前支撑轮 -->
   <link name="caster_wheel">
     <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
         <sphere radius="0.03"/>
       </geometry>
@@ -109,6 +108,7 @@
       </material>
     </visual>
     <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
         <sphere radius="0.03"/>
       </geometry>
@@ -118,17 +118,16 @@
       <inertia ixx="0.0001" ixy="0.0" ixz="0.0" iyy="0.0001" iyz="0.0" izz="0.0001"/>
     </inertial>
   </link>
-
   <joint name="caster_joint" type="fixed">
     <parent link="base_link"/>
     <child link="caster_wheel"/>
-    <!-- 优化：提高支撑轮高度 -->
-    <origin xyz="${base_length/2} 0.0 -${base_height/2 + 0.01}"/>
+    <origin xyz="0.2 0.0 -0.085" rpy="0 0 0"/>
   </joint>
 
   <!-- 摄像头 -->
   <link name="camera_link">
     <visual>
+      <origin xyz="0 0 0.025" rpy="0 0 0"/>
       <geometry>
         <box size="0.05 0.05 0.05"/>
       </geometry>
@@ -137,6 +136,7 @@
       </material>
     </visual>
     <collision>
+      <origin xyz="0 0 0.025" rpy="0 0 0"/>
       <geometry>
         <box size="0.05 0.05 0.05"/>
       </geometry>
@@ -146,23 +146,22 @@
       <inertia ixx="0.0001" ixy="0.0" ixz="0.0" iyy="0.0001" iyz="0.0" izz="0.0001"/>
     </inertial>
   </link>
-
   <joint name="camera_joint" type="fixed">
     <parent link="base_link"/>
     <child link="camera_link"/>
-    <origin xyz="${camera_x_offset} 0.0 ${camera_z_offset}" rpy="0 0 0"/>
+    <origin xyz="0.2 0.0 0.1" rpy="0 0 0"/>
   </joint>
 
   <!-- Gazebo插件 - 差速驱动控制器 -->
   <gazebo>
-    <plugin name="differential_drive_controller" filename="libgazebo_ros_diff_drive.so">
+    <plugin filename="libgazebo_ros_diff_drive.so" name="differential_drive_controller">
       <ros>
         <namespace>/</namespace>
       </ros>
       <left_joint>left_wheel_joint</left_joint>
       <right_joint>right_wheel_joint</right_joint>
-      <wheel_separation>${2 * wheel_y_offset}</wheel_separation>
-      <wheel_diameter>${2 * wheel_radius}</wheel_diameter>
+      <wheel_separation>0.3</wheel_separation>
+      <wheel_diameter>0.16</wheel_diameter>
       <command_topic>cmd_vel</command_topic>
       <odometry_topic>odom</odometry_topic>
       <odometry_frame>odom</odometry_frame>
@@ -174,10 +173,9 @@
 
   <!-- Gazebo插件 - 摄像头 -->
   <gazebo reference="camera_link">
-    <sensor type="camera" name="camera_sensor">
+    <sensor name="camera_sensor" type="camera">
       <update_rate>30.0</update_rate>
       <camera name="camera">
-        <!-- 优化：扩大视野至80度 -->
         <horizontal_fov>1.39626</horizontal_fov>
         <image>
           <width>640</width>
@@ -189,7 +187,7 @@
           <far>10.0</far>
         </clip>
       </camera>
-      <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
+      <plugin filename="libgazebo_ros_camera.so" name="camera_controller">
         <ros>
           <namespace>/camera</namespace>
         </ros>
@@ -198,6 +196,26 @@
         <hack_baseline>0.0</hack_baseline>
       </plugin>
     </sensor>
+  </gazebo>
+
+  <!-- 材质 Gazebo -->
+  <gazebo>
+    <material>Gazebo/Blue</material>
+  </gazebo>
+  <gazebo reference="base_link">
+    <material>Gazebo/Blue</material>
+  </gazebo>
+  <gazebo reference="left_wheel">
+    <material>Gazebo/Black</material>
+  </gazebo>
+  <gazebo reference="right_wheel">
+    <material>Gazebo/Black</material>
+  </gazebo>
+  <gazebo reference="caster_wheel">
+    <material>Gazebo/Grey</material>
+  </gazebo>
+  <gazebo reference="camera_link">
+    <material>Gazebo/Red</material>
   </gazebo>
 
 </robot>

@@ -4,6 +4,9 @@ project(vision_tracking)
 # Default to C++17
 set(CMAKE_CXX_STANDARD 17)
 
+list(APPEND CMAKE_PREFIX_PATH "/opt/ros/humble")  # 添加 ROS Humble 根路径
+list(APPEND CMAKE_MODULE_PATH "/opt/ros/humble/share/gazebo_ros/cmake")  # 添加 gazebo_ros 模块路径
+
 # Find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)

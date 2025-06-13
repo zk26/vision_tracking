@@ -1,133 +1,80 @@
-#!/usr/bin/env python3
-import os
-import sys  # 新增：用于 SystemExit
-from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import ExecuteProcess, TimerAction
 from launch_ros.actions import Node
-import xacro
+import os
+from ament_index_python.packages import get_package_share_directory
 
 def generate_launch_description():
-    pkg_dir = get_package_share_directory('vision_tracking')
-    
-    # 定义资源路径查找函数（保持原逻辑）
-    def find_resource(relative_path):
-        # 优先检查安装路径（colcon install后）
-        install_path = os.path.join(pkg_dir, '..', 'install', 'vision_tracking', relative_path)
-        if os.path.exists(install_path):
-            return install_path
-        
-        # 检查源路径（开发时）
-        source_path = os.path.join(pkg_dir, relative_path)
-        if os.path.exists(source_path):
-            return os.path.abspath(source_path)
-        
-        # 未找到文件时抛出 SystemExit（关键修改）
-        print(f"错误: 资源未找到: {relative_path}", file=sys.stderr)
-        raise SystemExit(1)  # 直接终止进程，退出码1表示错误
-
-    try:
-        urdf_path = find_resource("urdf/robot.xacro")
-        world_path = find_resource("worlds/empty.world")
-        rviz_config = find_resource("rviz/tracking.rviz")
-        color_params = find_resource("params/color_params.yaml")
-    except SystemExit:
-        # 资源加载失败时，launch 会捕获退出码并终止启动
-        return LaunchDescription([])  # 返回空列表，不启动任何节点
-
-    try:
-        robot_description = xacro.process_file(urdf_path).toxml()
-    except Exception as e:
-        print(f"URDF处理错误: {e}", file=sys.stderr)
-        raise SystemExit(1)  # URDF处理失败时终止
-
-    env_vars = dict(os.environ)
-    env_vars.update({
-        'LIBGL_ALWAYS_SOFTWARE': '1',
-        'ROS_DOMAIN_ID': '0'
-    })
+    pkg_path = get_package_share_directory('vision_tracking')
+    urdf_path = os.path.join(pkg_path, 'urdf', 'robot.urdf')
+    world_path = os.path.join(pkg_path, 'worlds', 'empty.world')
+    rviz_config_path = os.path.join(pkg_path, 'rviz', 'vision_tracking.rviz')
 
     return LaunchDescription([
-        # 启动Gazebo服务器
-        ExecuteProcess(
-            cmd=['gzserver', '--verbose', world_path],
+        # Step 1: robot_state_publisher（必须最先）
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='robot_state_publisher',
             output='screen',
-            name='gazebo_server',
-            env=env_vars
+            parameters=[{'robot_description': open(urdf_path).read(), 'use_sim_time': True}],
         ),
 
-        # 发布机器人状态（延迟3秒）
-        TimerAction(
-            period=3.0,
-            actions=[
-                Node(
-                    package='gazebo_ros',
-                    executable='spawn_entity.py',
-                    name='spawn_robot',
-                    arguments=[
-                        '-entity', 'vision_tracking_robot',
-                        '-topic', 'robot_description',
-                        '-x', '0.0', '-y', '0.0', '-z', '0.1',
-                        '-Y', '0.0'
-                    ],
-                    output='screen'
-                )
-            ]
+        # Step 2: Gazebo Server
+        ExecuteProcess(
+            cmd=['gzserver', '--verbose', '-s', 'libgazebo_ros_factory.so', world_path],
+            output='screen'
         ),
 
-        # 图像处理节点（传递颜色参数）
+        # Step 3: Gazebo Client，用 X11
+        ExecuteProcess(
+            cmd=['gzclient'],
+            output='screen',
+            additional_env={'QT_QPA_PLATFORM': 'xcb'}
+        ),
+
+        # Step 4: spawn_entity，加载机器人
+        ExecuteProcess(
+            cmd=['ros2', 'run', 'gazebo_ros', 'spawn_entity.py',
+                 '-entity', 'vision_robot',
+                 '-file', urdf_path],
+            output='screen'
+        ),
+
+        # Step 5: 图像、深度、控制器
         Node(
             package='vision_tracking',
             executable='image_processor',
             name='image_processor',
             output='screen',
-            parameters=[
-                color_params,
-                {'use_sim_time': True}
-            ]
+            parameters=[{'use_sim_time': True}]
         ),
-
-        # 深度处理节点
         Node(
             package='vision_tracking',
             executable='depth_processor',
             name='depth_processor',
             output='screen',
-            parameters=[
-                {'use_sim_time': True}
-            ]
+            parameters=[{'use_sim_time': True}]
         ),
-
-        # 控制节点
         Node(
             package='vision_tracking',
             executable='controller',
             name='controller',
             output='screen',
-            parameters=[
-                {'use_sim_time': True},
-                {'kp_linear': 0.3},
-                {'kp_angular': 0.8},
-                {'safe_distance': 0.5},
-                {'target_lost_timeout': 2.0},
-                {'max_linear_vel': 0.5},
-                {'max_angular_vel': 1.0}
-            ]
+            parameters=[{'use_sim_time': True}]
         ),
 
-        # RViz可视化（延迟10秒）
+        # Step 6: 延迟启动 RViz（延迟 5 秒）
         TimerAction(
-            period=10.0,
+            period=5.0,
             actions=[
                 Node(
                     package='rviz2',
                     executable='rviz2',
                     name='rviz2',
-                    arguments=['-d', rviz_config],
                     output='screen',
-                    parameters=[
-                        {'use_sim_time': True}
-                    ]
+                    arguments=['-d', rviz_config_path],
+                    additional_env={'QT_QPA_PLATFORM': 'xcb'}
                 )
             ]
         )
