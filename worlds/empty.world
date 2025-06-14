@@ -1,53 +1,122 @@
 <?xml version="1.0" ?>
-<sdf version="1.7">
-  <world name="empty">
-    <light name="sun1" type="directional">
-      <cast_shadows>true</cast_shadows>
-      <pose>0 0 10 0 0 0</pose>
-      <diffuse>0.8 0.8 0.8 1</diffuse>
-      <specular>0.2 0.2 0.2 1</specular>
-    </light>
+<sdf version="1.6">
+  <world name="ros2_test_world">
+    <!-- 地面 -->
+    <include>
+      <uri>model://ground_plane</uri>
+    </include>
 
-    <gravity>0 0 -9.8</gravity>
+    <!-- 太阳光 -->
+    <include>
+      <uri>model://sun</uri>
+    </include>
 
-    <model name="ground_plane">
-      <static>true</static>
+    <!-- 红色方块 -->
+    <model name="red_box">
+      <pose>1 0 0.5 0 0 0</pose>
       <link name="link">
-        <collision name="collision">
-          <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>100 100</size>
-            </plane>
-          </geometry>
-          <surface>
-            <friction>
-              <ode>
-                <mu>100</mu>
-                <mu2>50</mu2>
-              </ode>
-            </friction>
-            <bounce/>
-            <contact>
-              <ode/>
-            </contact>
-          </surface>
-        </collision>
         <visual name="visual">
           <geometry>
-            <plane>
-              <normal>0 0 1</normal>
-              <size>100 100</size>
-            </plane>
+            <box>
+              <size>0.5 0.5 0.5</size>
+            </box>
           </geometry>
           <material>
-            <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Grass</name>
-            </script>
+            <ambient>1 0 0 1</ambient>
+            <diffuse>1 0 0 1</diffuse>
           </material>
         </visual>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.5 0.5 0.5</size>
+            </box>
+          </geometry>
+        </collision>
+        <inertial>
+          <mass>1.0</mass>
+        </inertial>
       </link>
     </model>
+
+    <!-- 绿色方块 -->
+    <model name="green_box">
+      <pose>0 1 0.5 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.5 0.5 0.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0 1 0 1</ambient>
+            <diffuse>0 1 0 1</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.5 0.5 0.5</size>
+            </box>
+          </geometry>
+        </collision>
+        <inertial>
+          <mass>1.0</mass>
+        </inertial>
+      </link>
+    </model>
+
+    <!-- 蓝色方块 -->
+    <model name="blue_box">
+      <pose>-1 0 0.5 0 0 0</pose>
+      <link name="link">
+        <visual name="visual">
+          <geometry>
+            <box>
+              <size>0.5 0.5 0.5</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0 0 1 1</ambient>
+            <diffuse>0 0 1 1</diffuse>
+          </material>
+        </visual>
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.5 0.5 0.5</size>
+            </box>
+          </geometry>
+        </collision>
+        <inertial>
+          <mass>1.0</mass>
+        </inertial>
+      </link>
+    </model>
+
+    <!-- 摄像机 -->
+    <sensor name="camera_sensor" type="camera">
+      <pose>0 0 1.5 0 -0.5 0</pose> <!-- 斜视 -->
+      <camera>
+        <horizontal_fov>1.047</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.1</near>
+          <far>100</far>
+        </clip>
+      </camera>
+      <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
+        <ros>
+          <namespace>/camera</namespace>
+          <remapping>image_raw:=/camera/image_raw</remapping>
+        </ros>
+      </plugin>
+    </sensor>
+
   </world>
 </sdf>

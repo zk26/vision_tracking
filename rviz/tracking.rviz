@@ -1,15 +1,35 @@
 Panels:
-  []
+  - Class: rviz_default_plugins/DisplaysPanel
+    Name: Displays
+  - Class: rviz_default_plugins/ViewsPanel
+    Name: Views
+  - Class: rviz_default_plugins/SelectionPanel
+    Name: Selection
+
 Visualization Manager:
   Class: ""
-  Displays: ~
+  Displays:
+    - Class: rviz_default_plugins/Image
+      Enabled: true
+      Name: Depth Image
+      Queue Size: 10
+      Topic: /camera/depth/image_raw
+      Transport Hint: raw
+    - Class: rviz_default_plugins/TF
+      Enabled: true
+      Name: TF
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
     Fixed Frame: base_link
     Frame Rate: 30
   Name: root
-  Tools: ~
+  Tools:
+    - Class: rviz_default_plugins/Interact
+      Hide Inactive Objects: true
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
+    - Class: rviz_default_plugins/FocusCamera
   Transformation:
     Current:
       Class: rviz_default_plugins/TF
@@ -19,7 +39,7 @@ Visualization Manager:
       Class: rviz_default_plugins/Orbit
       Distance: 10
       Enable Stereo Rendering:
-        Stereo Eye Separation: 0.05999999865889549
+        Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
@@ -28,20 +48,19 @@ Visualization Manager:
         Y: 0
         Z: 0
       Focal Shape Fixed Size: true
-      Focal Shape Size: 0.05000000074505806
+      Focal Shape Size: 0.05
       Invert Z Axis: false
       Name: Current View
-      Near Clip Distance: 0.009999999776482582
-      Pitch: 0.7853981852531433
-      Target Frame: <Fixed Frame>
-      Value: Orbit (rviz_default_plugins)
-      Yaw: 0.7853981852531433
-    Saved: ~
+      Near Clip Distance: 0.01
+      Pitch: 0.785
+      Target Frame: base_link
+      Value: Orbit
+      Yaw: 0.785
 Window Geometry:
   Height: 841
-  Hide Left Dock: false
-  Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd000000000000047d000002ef00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Width: 1149
   X: 176
   Y: 131
+  Hide Left Dock: false
+  Hide Right Dock: false
+  QMainWindow State: 000000ff00000000fd000000000000047d000002ef00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
