@@ -63,7 +63,7 @@
   <joint name="left_wheel_joint" type="continuous">
     <parent link="base_link"/>
     <child link="left_wheel"/>
-    <origin xyz="0.0 0.15 -0.05" rpy="0 0 0"/>
+    <origin xyz="0.0 0.15 0.05" rpy="0 0 0"/>
     <axis xyz="0 1 0"/>
   </joint>
 
@@ -149,7 +149,7 @@
   <joint name="camera_joint" type="fixed">
     <parent link="base_link"/>
     <child link="camera_link"/>
-    <origin xyz="0.2 0.0 0.1" rpy="0 0 0"/>
+    <origin xyz="0.2 0.0 0.2" rpy="0 0 0"/>
   </joint>
 
   <!-- Gazebo插件 - 差速驱动控制器 -->

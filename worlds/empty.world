@@ -1,4 +1,4 @@
-<?xml version="1.0"?>
+<?xml version="1.0" ?>
 <sdf version="1.7">
   <world name="empty">
     <light name="sun1" type="directional">
@@ -7,19 +7,24 @@
       <diffuse>0.8 0.8 0.8 1</diffuse>
       <specular>0.2 0.2 0.2 1</specular>
     </light>
+
     <gravity>0 0 -9.8</gravity>
+
     <model name="ground_plane">
-      <static>true</static>  <!-- 地面固定不动 -->
+      <static>true</static>
       <link name="link">
         <collision name="collision">
           <geometry>
-            <plane>0 0 1 0 0</plane>  <!-- 平面方程：z=0 -->
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
           </geometry>
           <surface>
             <friction>
               <ode>
-                <mu>100</mu>       <!-- 高摩擦系数（避免物体滑动） -->
-                <mu2>50</mu2>      <!-- 次级摩擦系数 -->
+                <mu>100</mu>
+                <mu2>50</mu2>
               </ode>
             </friction>
             <bounce/>
@@ -30,12 +35,15 @@
         </collision>
         <visual name="visual">
           <geometry>
-            <plane>0 0 1 0 0</plane>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
           </geometry>
           <material>
             <script>
               <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Grass</name>  <!-- 草地材质（也可替换为其他如地板） -->
+              <name>Gazebo/Grass</name>
             </script>
           </material>
         </visual>
