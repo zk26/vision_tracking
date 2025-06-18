@@ -1,6 +1,20 @@
 <?xml version="1.0"?>
 <robot name="minimal_robot">
 
+  <!-- 材质 -->
+  <material name="blue">
+    <color rgba="0 0 1 1"/>
+  </material>
+  <material name="black">
+    <color rgba="0 0 0 1"/>
+  </material>
+  <material name="dark_gray">
+    <color rgba="0.2 0.2 0.2 1"/>
+  </material>
+  <material name="gray">
+    <color rgba="0.5 0.5 0.5 1"/>
+  </material>
+
   <!-- Base link: 车体主体 -->
   <link name="base_link">
     <visual>
@@ -272,36 +286,54 @@
 
   <!-- Gazebo相机传感器 -->
   <gazebo reference="camera_link">
-    <sensor type="camera" name="camera_sensor">
-      <pose>0 0 0 0 0 0</pose> <!-- 相机传感器位于camera_link原点 -->
-      <camera>
-        <horizontal_fov>1.047</horizontal_fov> <!-- 60度视角 -->
-        <image>
-          <width>640</width>
-          <height>480</height>
-          <format>R8G8B8</format>
-        </image>
-        <clip>
-          <near>0.1</near>
-          <far>10</far>
-        </clip>
-        <noise>
-          <type>gaussian</type>
-          <mean>0.0</mean>
-          <stddev>0.007</stddev>
-        </noise>
-      </camera>
-      <always_on>true</always_on>
-      <update_rate>30.0</update_rate>
-      <visualize>true</visualize>
-      <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
-        <camera_name>camera</camera_name>
-        <frame_name>camera_link</frame_name>
-        <image_topic_name>image_raw</image_topic_name>
-        <camera_info_topic_name>camera_info</camera_info_topic_name>
-        <robotNamespace>/</robotNamespace>
-      </plugin>
-    </sensor>
+    <sensor type="depth" name="camera_sensor">
+    <pose>0 0 0 0 0 0</pose> <!-- 相机传感器位于camera_link原点 -->
+    <camera>
+      <horizontal_fov>1.047</horizontal_fov> <!-- 60度视角 -->
+      <image>
+        <width>640</width>
+        <height>480</height>
+        <format>R8G8B8</format> <!-- 彩色图 -->
+      </image>
+      <clip>
+        <near>0.1</near>
+        <far>10</far>
+      </clip>
+      <depth_camera>
+        <format>16UC1</format> <!-- 深度图格式 -->
+      </depth_camera>
+      <noise>
+        <type>gaussian</type>
+        <mean>0.0</mean>
+        <stddev>0.007</stddev>
+      </noise>
+    </camera>
+    <always_on>true</always_on>
+    <update_rate>30.0</update_rate>
+    <visualize>true</visualize>
+    <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
+      <camera_name>camera</camera_name>
+      <frame_name>camera_link</frame_name>
+      <image_topic_name>image_raw</image_topic_name> <!-- 彩色图 -->
+      <depth_image_topic_name>depth/image_raw</depth_image_topic_name> <!-- 深度图 -->
+      <camera_info_topic_name>camera_info</camera_info_topic_name>
+      <robotNamespace>/</robotNamespace>
+    </plugin>
+  </sensor>
   </gazebo>
+
+  <plugin name="diff_drive_controller" filename="libgazebo_ros_diff_drive.so">
+  <ros>
+    <namespace>/</namespace>
+    <remapping>cmd_vel:=/cmd_vel</remapping>
+  </ros>
+  <updateRate>100</updateRate>
+  <leftJoint>wheel_fl</leftJoint>   <!-- 左轮轮关节名称 -->
+  <rightJoint>wheel_fr</rightJoint>  <!-- 右轮轮关节名称 -->
+  <wheelSeparation>0.2</wheelSeparation>    <!-- 轮距，根据你机器人尺寸调 -->
+  <wheelRadius>0.05</wheelRadius>           <!-- 轮子半径 -->
+  <topicName>/cmd_vel</topicName>           <!-- 监听cmd_vel -->
+</plugin>
+
 
 </robot>

@@ -18,7 +18,7 @@ public:
             std::bind(&ImageProcessor::image_callback, this, std::placeholders::_1),
             "raw");
 
-        position_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("target_position", 10);
+        position_pub_ = this->create_publisher<geometry_msgs::msg::PointStamped>("target_position_2d", 10);
         debug_pub_ = image_transport::create_publisher(this, "debug_image");
 
         RCLCPP_INFO(this->get_logger(), "Image Processor node started.");
