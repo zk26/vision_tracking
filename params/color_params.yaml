@@ -1,33 +1,11 @@
-/**:
+image_processor:
   ros__parameters:
+    camera_frame: "camera_link"
+    h_min: 30
+    h_max: 90
+    s_min: 100
+    s_max: 255
+    v_min: 100
+    v_max: 255
     min_radius: 20
     processing_scale: 0.5
-    color_settings:
-      red:
-        h_min: 0
-        h_max: 10
-        s_min: 120
-        s_max: 255
-        v_min: 70
-        v_max: 255
-      blue:
-        h_min: 90
-        h_max: 130
-        s_min: 100
-        s_max: 255
-        v_min: 50
-        v_max: 255
-      green:
-        h_min: 40
-        h_max: 80
-        s_min: 100
-        s_max: 255
-        v_min: 50
-        v_max: 255
-      yellow:
-        h_min: 20
-        h_max: 40
-        s_min: 100
-        s_max: 255
-        v_min: 100
-        v_max: 255

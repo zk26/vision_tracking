@@ -66,6 +66,7 @@ CMAKE_BINARY_DIR = /home/lvu/ros2_ws/src/vision_tracking/build
 all: CMakeFiles/image_processor.dir/all
 all: CMakeFiles/depth_processor.dir/all
 all: CMakeFiles/controller.dir/all
+all: CMakeFiles/tf_broadcaster.dir/all
 .PHONY : all
 
 # The main recursive "preinstall" target.
@@ -78,6 +79,7 @@ clean: CMakeFiles/vision_tracking_uninstall.dir/clean
 clean: CMakeFiles/image_processor.dir/clean
 clean: CMakeFiles/depth_processor.dir/clean
 clean: CMakeFiles/controller.dir/clean
+clean: CMakeFiles/tf_broadcaster.dir/clean
 .PHONY : clean
 
 #=============================================================================
@@ -209,6 +211,32 @@ controller: CMakeFiles/controller.dir/rule
 CMakeFiles/controller.dir/clean:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/controller.dir/build.make CMakeFiles/controller.dir/clean
 .PHONY : CMakeFiles/controller.dir/clean
+
+#=============================================================================
+# Target rules for target CMakeFiles/tf_broadcaster.dir
+
+# All Build rule for target.
+CMakeFiles/tf_broadcaster.dir/all:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/tf_broadcaster.dir/build.make CMakeFiles/tf_broadcaster.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/tf_broadcaster.dir/build.make CMakeFiles/tf_broadcaster.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color --switch=$(COLOR) --progress-dir=/home/lvu/ros2_ws/src/vision_tracking/build/CMakeFiles --progress-num=7,8 "Built target tf_broadcaster"
+.PHONY : CMakeFiles/tf_broadcaster.dir/all
+
+# Build rule for subdir invocation for target.
+CMakeFiles/tf_broadcaster.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/lvu/ros2_ws/src/vision_tracking/build/CMakeFiles 2
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/tf_broadcaster.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/lvu/ros2_ws/src/vision_tracking/build/CMakeFiles 0
+.PHONY : CMakeFiles/tf_broadcaster.dir/rule
+
+# Convenience name for target.
+tf_broadcaster: CMakeFiles/tf_broadcaster.dir/rule
+.PHONY : tf_broadcaster
+
+# clean rule for target.
+CMakeFiles/tf_broadcaster.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/tf_broadcaster.dir/build.make CMakeFiles/tf_broadcaster.dir/clean
+.PHONY : CMakeFiles/tf_broadcaster.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.

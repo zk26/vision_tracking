@@ -24,7 +24,6 @@
   </link>
 
   <!-- 轮子竖着（绕Z轴转） -->
-  <!-- 轮子是竖直放置的，模型本身绕X轴旋转90度来体现竖着 -->
   <link name="wheel_fl">
     <visual>
       <geometry>
@@ -137,7 +136,7 @@
     <axis xyz="0 0 1"/>
   </joint>
 
-    <!-- 摄像头支撑底座 -->
+  <!-- 摄像头支撑底座 -->
   <link name="camera_base">
     <visual>
       <geometry>
@@ -145,6 +144,18 @@
       </geometry>
       <material name="dark_gray"/>
     </visual>
+    <collision>
+      <geometry>
+        <box size="0.06 0.06 0.02"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.1"/>
+      <inertia ixx="0.0001" ixy="0.0" ixz="0.0"
+               iyy="0.0001" iyz="0.0"
+               izz="0.0001"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </inertial>
   </link>
 
   <joint name="joint_camera_base" type="fixed">
@@ -161,6 +172,18 @@
       </geometry>
       <material name="gray"/>
     </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.01" length="0.06"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.05"/>
+      <inertia ixx="0.00005" ixy="0.0" ixz="0.0"
+               iyy="0.00005" iyz="0.0"
+               izz="0.00005"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </inertial>
   </link>
 
   <joint name="joint_camera_support" type="fixed">
@@ -177,6 +200,18 @@
       </geometry>
       <material name="black"/>
     </visual>
+    <collision>
+      <geometry>
+        <box size="0.09 0.07 0.07"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.2"/>
+      <inertia ixx="0.0002" ixy="0.0" ixz="0.0"
+               iyy="0.0002" iyz="0.0"
+               izz="0.0002"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </inertial>
   </link>
 
   <joint name="joint_camera" type="fixed">
@@ -193,12 +228,24 @@
       </geometry>
       <material name="blue"/>
     </visual>
+    <collision>
+      <geometry>
+        <cylinder radius="0.03" length="0.01"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.05"/>
+      <inertia ixx="0.00005" ixy="0.0" ixz="0.0"
+               iyy="0.00005" iyz="0.0"
+               izz="0.00005"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+    </inertial>
   </link>
 
   <joint name="joint_camera_lens" type="fixed">
     <parent link="camera_link"/>
     <child link="camera_lens"/>
-    <origin xyz="0.045 0 0" rpy="0 1.5708 0"/> 
+    <origin xyz="0.045 0 0" rpy="0 1.5708 0"/>
   </joint>
 
   <!-- 驾驶舱link（正方体，半透明蓝色） -->
@@ -223,6 +270,38 @@
     <origin xyz="0 0 0.1" rpy="0 0 0"/>
   </joint>
 
-
+  <!-- Gazebo相机传感器 -->
+  <gazebo reference="camera_link">
+    <sensor type="camera" name="camera_sensor">
+      <pose>0 0 0 0 0 0</pose> <!-- 相机传感器位于camera_link原点 -->
+      <camera>
+        <horizontal_fov>1.047</horizontal_fov> <!-- 60度视角 -->
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.1</near>
+          <far>10</far>
+        </clip>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.007</stddev>
+        </noise>
+      </camera>
+      <always_on>true</always_on>
+      <update_rate>30.0</update_rate>
+      <visualize>true</visualize>
+      <plugin name="camera_controller" filename="libgazebo_ros_camera.so">
+        <camera_name>camera</camera_name>
+        <frame_name>camera_link</frame_name>
+        <image_topic_name>image_raw</image_topic_name>
+        <camera_info_topic_name>camera_info</camera_info_topic_name>
+        <robotNamespace>/</robotNamespace>
+      </plugin>
+    </sensor>
+  </gazebo>
 
 </robot>

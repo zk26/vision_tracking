@@ -20,17 +20,17 @@ find_package(tf2_geometry_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(gazebo_ros REQUIRED)
 find_package(robot_state_publisher REQUIRED)
+find_package(Eigen3 REQUIRED)  # Eigen3 支持
 
 # ==== 头文件包含设置 ==== #
-include_directories(include)  # 添加全局包含路径
+include_directories(include)  # 添加全局包含路径，方便KalmanFilter等头文件查找
 
 # Create executables
+
 add_executable(image_processor src/image_processor.cpp)
 ament_target_dependencies(image_processor
   rclcpp cv_bridge image_transport sensor_msgs geometry_msgs)
-target_link_libraries(image_processor ${OpenCV_LIBS})
-
-# 为image_processor指定包含路径
+target_link_libraries(image_processor ${OpenCV_LIBS} Eigen3::Eigen)
 target_include_directories(image_processor PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
@@ -39,9 +39,7 @@ target_include_directories(image_processor PUBLIC
 add_executable(depth_processor src/depth_processor.cpp)
 ament_target_dependencies(depth_processor
   rclcpp cv_bridge sensor_msgs geometry_msgs image_geometry tf2_ros tf2_geometry_msgs)
-target_link_libraries(depth_processor ${OpenCV_LIBS})
-
-# 为depth_processor指定包含路径
+target_link_libraries(depth_processor ${OpenCV_LIBS} Eigen3::Eigen)
 target_include_directories(depth_processor PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
@@ -50,27 +48,35 @@ target_include_directories(depth_processor PUBLIC
 add_executable(controller src/controller.cpp)
 ament_target_dependencies(controller
   rclcpp geometry_msgs tf2_ros tf2_geometry_msgs)
-
-# 为controller指定包含路径
+target_link_libraries(controller Eigen3::Eigen)
 target_include_directories(controller PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>
 )
 
+add_executable(tf_broadcaster src/tf_broadcaster.cpp)
+ament_target_dependencies(tf_broadcaster
+  rclcpp
+  tf2_ros
+  tf2_geometry_msgs
+  geometry_msgs
+)
+target_include_directories(tf_broadcaster PUBLIC
+  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+  $<INSTALL_INTERFACE:include>
+)
+
 # ==== 安装设置 ==== #
-# 安装可执行文件
 install(TARGETS 
-  image_processor depth_processor controller
+  image_processor depth_processor controller tf_broadcaster
   DESTINATION lib/${PROJECT_NAME}
 )
 
-# 安装所有参数文件和目录
 install(
   DIRECTORY params/
   DESTINATION share/${PROJECT_NAME}/params
 )
 
-# 安装其他资源
 install(
   DIRECTORY launch/
   DESTINATION share/${PROJECT_NAME}/launch
@@ -94,12 +100,6 @@ install(
 install(
   DIRECTORY worlds/
   DESTINATION share/${PROJECT_NAME}/worlds
-)
-
-# 安装头文件
-install(
-  DIRECTORY include/
-  DESTINATION include/
 )
 
 ament_package()

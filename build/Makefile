@@ -236,6 +236,19 @@ controller/fast:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/controller.dir/build.make CMakeFiles/controller.dir/build
 .PHONY : controller/fast
 
+#=============================================================================
+# Target rules for targets named tf_broadcaster
+
+# Build rule for target.
+tf_broadcaster: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tf_broadcaster
+.PHONY : tf_broadcaster
+
+# fast build rule for target.
+tf_broadcaster/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/tf_broadcaster.dir/build.make CMakeFiles/tf_broadcaster.dir/build
+.PHONY : tf_broadcaster/fast
+
 src/controller.o: src/controller.cpp.o
 .PHONY : src/controller.o
 
@@ -308,6 +321,30 @@ src/image_processor.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/image_processor.dir/build.make CMakeFiles/image_processor.dir/src/image_processor.cpp.s
 .PHONY : src/image_processor.cpp.s
 
+src/tf_broadcaster.o: src/tf_broadcaster.cpp.o
+.PHONY : src/tf_broadcaster.o
+
+# target to build an object file
+src/tf_broadcaster.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/tf_broadcaster.dir/build.make CMakeFiles/tf_broadcaster.dir/src/tf_broadcaster.cpp.o
+.PHONY : src/tf_broadcaster.cpp.o
+
+src/tf_broadcaster.i: src/tf_broadcaster.cpp.i
+.PHONY : src/tf_broadcaster.i
+
+# target to preprocess a source file
+src/tf_broadcaster.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/tf_broadcaster.dir/build.make CMakeFiles/tf_broadcaster.dir/src/tf_broadcaster.cpp.i
+.PHONY : src/tf_broadcaster.cpp.i
+
+src/tf_broadcaster.s: src/tf_broadcaster.cpp.s
+.PHONY : src/tf_broadcaster.s
+
+# target to generate assembly for a file
+src/tf_broadcaster.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/tf_broadcaster.dir/build.make CMakeFiles/tf_broadcaster.dir/src/tf_broadcaster.cpp.s
+.PHONY : src/tf_broadcaster.cpp.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -326,6 +363,7 @@ help:
 	@echo "... controller"
 	@echo "... depth_processor"
 	@echo "... image_processor"
+	@echo "... tf_broadcaster"
 	@echo "... src/controller.o"
 	@echo "... src/controller.i"
 	@echo "... src/controller.s"
@@ -335,6 +373,9 @@ help:
 	@echo "... src/image_processor.o"
 	@echo "... src/image_processor.i"
 	@echo "... src/image_processor.s"
+	@echo "... src/tf_broadcaster.o"
+	@echo "... src/tf_broadcaster.i"
+	@echo "... src/tf_broadcaster.s"
 .PHONY : help
 
 

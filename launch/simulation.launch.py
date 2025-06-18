@@ -18,8 +18,11 @@ def generate_launch_description():
         robot_desc = ''
         print(f"[ERROR] 读取URDF文件失败: {e}")
 
+    # 这里拿到当前shell的DISPLAY环境变量，默认是:0
+    display_env = os.environ.get('DISPLAY', ':0')
+
     return LaunchDescription([
-        # 1. 启动 robot_state_publisher 发布 robot_description
+        # 1. robot_state_publisher发布robot_description
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
@@ -31,20 +34,23 @@ def generate_launch_description():
             }],
         ),
 
-        # 2. 启动 Gazebo 服务器，加载空世界
+        # 2. 启动Gazebo服务器，加载空世界
         ExecuteProcess(
             cmd=['gzserver', '--verbose', '-s', 'libgazebo_ros_factory.so', world_path],
             output='screen'
         ),
 
-        # 3. 启动 Gazebo 客户端，用于可视化
+        # 3. 启动Gazebo客户端，带X11环境
         ExecuteProcess(
             cmd=['gzclient'],
             output='screen',
-            additional_env={'QT_QPA_PLATFORM': 'xcb'}
+            additional_env={
+                'QT_QPA_PLATFORM': 'xcb',
+                'DISPLAY': display_env,
+            }
         ),
 
-        # 4. 延迟6秒启动 spawn_entity，确保 Gazebo 和 robot_description 准备好
+        # 4. 延迟6秒启动spawn_entity，确保gazebo和robot_description准备好
         TimerAction(
             period=6.0,
             actions=[
@@ -57,7 +63,24 @@ def generate_launch_description():
             ]
         ),
 
-        # 5. 启动图像处理器节点
+        # 5. 启动tf_broadcaster节点
+        Node(
+            package="vision_tracking",
+            executable="tf_broadcaster",
+            name="tf_broadcaster",
+            parameters=[{
+                "parent_frame": "base_footprint",
+                "child_frame": "camera_link",
+                "x": 0.0,
+                "y": 0.0,
+                "z": 1.0,
+                "roll": 0.0,
+                "pitch": 0.0,
+                "yaw": 0.0,
+            }],
+        ),
+
+        # 6. 启动image_processor节点
         Node(
             package='vision_tracking',
             executable='image_processor',
@@ -66,7 +89,7 @@ def generate_launch_description():
             parameters=[{'use_sim_time': True}]
         ),
 
-        # 6. 启动深度处理器节点
+        # 7. 启动depth_processor节点
         Node(
             package='vision_tracking',
             executable='depth_processor',
@@ -75,7 +98,7 @@ def generate_launch_description():
             parameters=[{'use_sim_time': True}]
         ),
 
-        # 7. 启动控制器节点
+        # 8. 启动controller节点
         Node(
             package='vision_tracking',
             executable='controller',
@@ -84,7 +107,7 @@ def generate_launch_description():
             parameters=[{'use_sim_time': True}]
         ),
 
-        # 8. 延迟5秒启动 RViz，确保模型加载完成
+        # 9. 延迟5秒启动RViz，带X11环境
         TimerAction(
             period=5.0,
             actions=[
@@ -94,7 +117,10 @@ def generate_launch_description():
                     name='rviz2',
                     output='screen',
                     arguments=['-d', rviz_config_path],
-                    additional_env={'QT_QPA_PLATFORM': 'xcb'}
+                    additional_env={
+                        'QT_QPA_PLATFORM': 'xcb',
+                        'DISPLAY': display_env,
+                    }
                 )
             ]
         )
